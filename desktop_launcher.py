@@ -20,7 +20,7 @@ class VectorRAGLauncher:
     def __init__(self):
         self.root = tk.Tk()
         self.server_process: Optional[subprocess.Popen] = None
-        self.server_port = 5000
+        self.server_port = 5001
         self.server_url = f"http://localhost:{self.server_port}"
         self.setup_ui()
         
@@ -218,9 +218,17 @@ class VectorRAGLauncher:
         try:
             self.update_status("🚀 Starting Vector RAG Database server...")
             
-            # Check if app.py exists
-            if not os.path.exists("app.py"):
-                self.update_status("❌ app.py not found in current directory")
+            # Check if app.py exists, prefer demo version for easy launch
+            app_files = ["app_demo.py", "app.py"]
+            app_to_use = None
+            
+            for app_file in app_files:
+                if os.path.exists(app_file):
+                    app_to_use = app_file
+                    break
+                    
+            if not app_to_use:
+                self.update_status("❌ No Flask application file found")
                 self._reset_ui()
                 return
                 
@@ -228,11 +236,11 @@ class VectorRAGLauncher:
                 # Set environment variables for Flask
                 env = os.environ.copy()
                 env['FLASK_ENV'] = 'development'
-                env['FLASK_APP'] = 'app.py'
+                env['FLASK_APP'] = app_to_use
                 
                 # Start the server
                 self.server_process = subprocess.Popen([
-                    sys.executable, "app.py"
+                    sys.executable, app_to_use
                 ], 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,

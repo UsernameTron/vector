@@ -26,7 +26,7 @@ class VectorDatabase:
         try:
             self.collection = self.client.get_collection(name=self.collection_name)
             logger.info(f"Loaded existing collection: {self.collection_name}")
-        except ValueError:
+        except Exception:  # Handle both ValueError and NotFoundError
             self.collection = self.client.create_collection(
                 name=self.collection_name,
                 metadata={"hnsw:space": "cosine"}

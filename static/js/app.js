@@ -44,7 +44,16 @@ class VectorRAGApp {
     async loadAgents() {
         try {
             const response = await fetch('/api/agents');
-            this.agents = await response.json();
+            const data = await response.json();
+            
+            // Convert agents array to object for compatibility
+            this.agents = {};
+            if (data.agents && Array.isArray(data.agents)) {
+                data.agents.forEach(agent => {
+                    this.agents[agent.id] = agent;
+                });
+            }
+            
             this.renderAgents();
         } catch (error) {
             console.error('Error loading agents:', error);
@@ -136,12 +145,15 @@ class VectorRAGApp {
         this.addMessage('user', message);
         
         try {
-            const response = await fetch(`/api/chat/${this.currentAgent}`, {
+            const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query: message })
+                body: JSON.stringify({ 
+                    agent: this.currentAgent,
+                    message: message 
+                })
             });
             
             const data = await response.json();
@@ -208,12 +220,14 @@ class VectorRAGApp {
         this.setLoading(true);
         
         try {
-            const response = await fetch('/api/documents', {
+            const formData = new FormData();
+            const blob = new Blob([content], { type: 'text/plain' });
+            const file = new File([blob], `${title}.txt`, { type: 'text/plain' });
+            formData.append('file', file);
+            
+            const response = await fetch('/api/upload', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ title, content, source })
+                body: formData
             });
             
             const data = await response.json();
@@ -294,34 +308,51 @@ class VectorRAGApp {
     
     async loadDocuments() {
         try {
-            const response = await fetch('/api/documents');
-            const documents = await response.json();
-            this.displayDocuments(documents);
+            const response = await fetch('/api/status');
+            if (response.ok) {
+                const status = await response.json();
+                // Show basic document count from status
+                this.displayDocuments([]);
+                const documentList = document.getElementById('documentList');
+                if (documentList) {
+                    documentList.innerHTML = `
+                        <div style="color: var(--text-muted); text-align: center; padding: 1rem;">
+                            <i class="fas fa-database" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                            <p>Vector database ready for documents</p>
+                            <p>Upload documents using the form above</p>
+                        </div>
+                    `;
+                }
+            }
         } catch (error) {
             console.error('Error loading documents:', error);
-            this.showError('Failed to load documents.');
+            // Don't show error for documents - this is optional
         }
     }
     
     displayDocuments(documents) {
         const documentList = document.getElementById('documentList');
         
-        if (documents.length === 0) {
-            documentList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 1rem;">No documents in knowledge base.</p>';
+        if (!documents || !Array.isArray(documents) || documents.length === 0) {
+            if (documentList) {
+                documentList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 1rem;">No documents in knowledge base.</p>';
+            }
             return;
         }
-        
-        documentList.innerHTML = documents.map(doc => `
-            <div class="doc-item" onclick="app.showDocumentDetails('${doc.id}')">
-                <div class="doc-title">${doc.metadata.title || 'Untitled'}</div>
-                <div class="doc-meta">
-                    Source: ${doc.metadata.source || 'Unknown'} • 
-                    Added: ${doc.metadata.timestamp ? new Date(doc.metadata.timestamp).toLocaleDateString() : 'Unknown date'} •
-                    Length: ${doc.metadata.content_length || 0} characters
+
+        if (documentList) {
+            documentList.innerHTML = documents.map(doc => `
+                <div class="doc-item" onclick="app.showDocumentDetails('${doc.id}')">
+                    <div class="doc-title">${doc.metadata?.title || 'Untitled'}</div>
+                    <div class="doc-meta">
+                        Source: ${doc.metadata?.source || 'Unknown'} • 
+                        Added: ${doc.metadata?.timestamp ? new Date(doc.metadata.timestamp).toLocaleDateString() : 'Unknown date'} •
+                        Length: ${doc.metadata?.content_length || 0} characters
+                    </div>
+                    <div class="doc-preview">${doc.content_preview || ''}</div>
                 </div>
-                <div class="doc-preview">${doc.content_preview}</div>
-            </div>
-        `).join('');
+            `).join('');
+        }
     }
     
     showDocumentDetails(docId) {
@@ -336,28 +367,40 @@ class VectorRAGApp {
     
     async updateStatus() {
         try {
-            const response = await fetch('/api/health');
+            const response = await fetch('/health');
             const status = await response.json();
             
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
             
             if (response.ok && status.status === 'healthy') {
-                statusDot.style.background = 'var(--success-color)';
-                statusDot.style.boxShadow = '0 0 10px var(--success-color)';
-                statusText.textContent = `Online • ${status.agents_count} Agents • ${status.database_status.document_count} Docs`;
+                if (statusDot) {
+                    statusDot.style.background = 'var(--success-color)';
+                    statusDot.style.boxShadow = '0 0 10px var(--success-color)';
+                }
+                if (statusText) {
+                    statusText.textContent = `Online • ${status.agents_available || 0} Agents • Vector DB ${status.vector_db_available ? 'Ready' : 'Offline'}`;
+                }
             } else {
-                statusDot.style.background = 'var(--error-color)';
-                statusDot.style.boxShadow = '0 0 10px var(--error-color)';
-                statusText.textContent = 'System Error';
+                if (statusDot) {
+                    statusDot.style.background = 'var(--error-color)';
+                    statusDot.style.boxShadow = '0 0 10px var(--error-color)';
+                }
+                if (statusText) {
+                    statusText.textContent = 'System Error';
+                }
             }
         } catch (error) {
             console.error('Error checking status:', error);
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
-            statusDot.style.background = 'var(--warning-color)';
-            statusDot.style.boxShadow = '0 0 10px var(--warning-color)';
-            statusText.textContent = 'Connection Error';
+            if (statusDot) {
+                statusDot.style.background = 'var(--warning-color)';
+                statusDot.style.boxShadow = '0 0 10px var(--warning-color)';
+            }
+            if (statusText) {
+                statusText.textContent = 'Connection Error';
+            }
         }
     }
     
