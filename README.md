@@ -29,18 +29,51 @@ A standalone cyberpunk-themed application featuring 6 specialized AI agents with
 
 ## 🚀 Quick Start
 
+### Option 1: Desktop Launcher (Recommended)
+**Easy one-click startup with GUI interface:**
+
+```bash
+# Make scripts executable (Linux/Mac)
+chmod +x desktop_launcher.py launch.sh
+
+# Launch with GUI (Linux/Mac)
+./launch.sh
+
+# Or run directly
+python3 desktop_launcher.py
+```
+
+**Windows users:**
+- Double-click `launch.bat` or run `python desktop_launcher.py`
+
+### Option 2: Manual Command Line
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
-# Set OpenAI API key
-export OPENAI_API_KEY="your-api-key"
+# Configure environment
+cp .env.template .env
+# Edit .env and add your OPENAI_API_KEY
 
 # Run the application
 python app.py
 ```
 
 Visit `http://localhost:5000` to access the Vector RAG Database interface.
+
+## 🖥️ Desktop Launcher Features
+
+The desktop launcher provides:
+- **One-click startup** - Automatic dependency checking and server launch
+- **Browser integration** - Automatically opens web interface when ready
+- **Status monitoring** - Real-time system status and health checks
+- **Easy shutdown** - Clean server termination with confirmation
+- **Error handling** - Helpful error messages and troubleshooting tips
+
+**Launcher Requirements:**
+- Python 3.7+
+- Tkinter (usually included with Python)
+- All project dependencies (automatically checked)
 
 ## 🏗️ Architecture
 
