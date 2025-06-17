@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector RAG Database - AI Agent Command Center</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="matrix-bg"></div>
+    
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">
+                    <i class="fas fa-cube"></i>
+                    Vector RAG Database
+                </h1>
+                <div class="status-indicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span class="status-text" id="statusText">Initializing...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Agent Selection Panel -->
+            <section class="agent-panel">
+                <h2 class="section-title">
+                    <i class="fas fa-robot"></i>
+                    AI Agent Command Center
+                </h2>
+                <div class="agent-grid" id="agentGrid">
+                    <!-- Agents will be loaded dynamically -->
+                </div>
+            </section>
+
+            <!-- Chat Interface -->
+            <section class="chat-section">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <h3 id="currentAgentName">Select an AI Agent</h3>
+                        <div class="chat-controls">
+                            <button class="btn-icon" id="clearChat" title="Clear Chat">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="welcome-message">
+                            <i class="fas fa-brain"></i>
+                            <h4>Welcome to Vector RAG Database</h4>
+                            <p>Select an AI agent above to start your intelligent conversation.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <div class="input-group">
+                            <input type="text" id="messageInput" placeholder="Enter your message..." disabled>
+                            <button id="sendButton" class="btn-send" disabled>
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Document Management -->
+            <section class="document-section">
+                <h2 class="section-title">
+                    <i class="fas fa-database"></i>
+                    Knowledge Base Management
+                </h2>
+                
+                <div class="document-controls">
+                    <div class="upload-container">
+                        <h4>Add New Document</h4>
+                        <div class="form-group">
+                            <input type="text" id="docTitle" placeholder="Document Title">
+                        </div>
+                        <div class="form-group">
+                            <textarea id="docContent" placeholder="Document Content" rows="6"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="docSource" placeholder="Source (optional)">
+                        </div>
+                        <button id="uploadDoc" class="btn-primary">
+                            <i class="fas fa-upload"></i>
+                            Add to Knowledge Base
+                        </button>
+                    </div>
+                    
+                    <div class="search-container">
+                        <h4>Search Knowledge Base</h4>
+                        <div class="search-group">
+                            <input type="text" id="searchQuery" placeholder="Search documents...">
+                            <button id="searchDocs" class="btn-secondary">
+                                <i class="fas fa-search"></i>
+                                Search
+                            </button>
+                        </div>
+                        <div id="searchResults" class="search-results"></div>
+                    </div>
+                </div>
+                
+                <div class="document-list">
+                    <h4>Stored Documents</h4>
+                    <div id="documentList" class="doc-list">
+                        <!-- Documents will be loaded dynamically -->
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="cyber-spinner"></div>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
