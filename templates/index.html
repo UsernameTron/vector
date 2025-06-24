@@ -82,19 +82,52 @@
                 <div class="document-controls">
                     <div class="upload-container">
                         <h4>Add New Document</h4>
-                        <div class="form-group">
-                            <input type="text" id="docTitle" placeholder="Document Title">
+                        
+                        <!-- File Upload Option -->
+                        <div class="upload-tabs">
+                            <button type="button" class="tab-btn active" id="fileTab" onclick="app.switchUploadMode('file')">
+                                <i class="fas fa-file-upload"></i> Upload File
+                            </button>
+                            <button type="button" class="tab-btn" id="textTab" onclick="app.switchUploadMode('text')">
+                                <i class="fas fa-edit"></i> Paste Text
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <textarea id="docContent" placeholder="Document Content" rows="6"></textarea>
+                        
+                        <!-- File Upload Section -->
+                        <div id="fileUploadSection" class="upload-section">
+                            <div class="form-group">
+                                <input type="file" id="docFile" accept=".txt,.md,.pdf,.doc,.docx" multiple>
+                                <label for="docFile" class="file-upload-label">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    Choose files or drag and drop
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="fileSource" placeholder="Source (optional)">
+                            </div>
+                            <button id="uploadFiles" class="btn-primary">
+                                <i class="fas fa-upload"></i>
+                                Upload Files to Knowledge Base
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <input type="text" id="docSource" placeholder="Source (optional)">
+                        
+                        <!-- Text Input Section -->
+                        <div id="textUploadSection" class="upload-section" style="display: none;">
+                            <div class="form-group">
+                                <input type="text" id="docTitle" placeholder="Document Title">
+                            </div>
+                            <div class="form-group">
+                                <textarea id="docContent" placeholder="Document Content (paste your content here)" rows="6" 
+                                          style="resize: vertical; min-height: 120px;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="docSource" placeholder="Source (optional)">
+                            </div>
+                            <button id="uploadDoc" class="btn-primary">
+                                <i class="fas fa-upload"></i>
+                                Add to Knowledge Base
+                            </button>
                         </div>
-                        <button id="uploadDoc" class="btn-primary">
-                            <i class="fas fa-upload"></i>
-                            Add to Knowledge Base
-                        </button>
                     </div>
                     
                     <div class="search-container">

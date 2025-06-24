@@ -576,6 +576,123 @@ body {
     line-height: 1.4;
 }
 
+/* Upload Tabs */
+.upload-tabs {
+    display: flex;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 2px solid transparent;
+    font-family: inherit;
+}
+
+.tab-btn.active {
+    color: var(--primary-blue);
+    border-bottom-color: var(--primary-blue);
+    box-shadow: var(--glow-secondary);
+}
+
+.tab-btn:hover {
+    color: var(--hover-color);
+}
+
+/* Upload Sections */
+.upload-section {
+    margin-top: 1rem;
+}
+
+/* File Upload Styles */
+#docFile {
+    display: none;
+}
+
+.file-upload-label {
+    display: block;
+    background: var(--bg-primary);
+    border: 2px dashed var(--border-color);
+    color: var(--text-secondary);
+    padding: 2rem;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.file-upload-label:hover {
+    border-color: var(--hover-color);
+    color: var(--hover-color);
+    box-shadow: var(--glow-secondary);
+}
+
+.file-upload-label i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+/* Drag and Drop Styles */
+.file-upload-label.drag-over {
+    border-color: var(--success-color);
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--success-color);
+}
+
+/* File List Display */
+.file-list {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-name {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.file-size {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.file-remove {
+    background: var(--error-color);
+    border: none;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.file-remove:hover {
+    background: #ff6b8a;
+}
+
 /* Loading Overlay */
 .loading-overlay {
     position: fixed;

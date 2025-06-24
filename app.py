@@ -45,6 +45,14 @@ agents = {
     'contact_center': ContactCenterDirectorAgent(vector_db)
 }
 
+@app.route('/favicon.ico')
+def favicon():
+    """Return a simple favicon to prevent 404 errors"""
+    from flask import Response
+    # Return a minimal 1x1 transparent PNG
+    transparent_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    return Response(transparent_png, mimetype='image/png')
+
 @app.route('/')
 def index():
     """Main dashboard route"""
@@ -160,6 +168,40 @@ def health_check():
         'agents_count': len(agents)
     })
 
+@app.route('/health', methods=['GET'])
+def health():
+    """Alternative health check endpoint"""
+    try:
+        db_status = vector_db.get_status()
+        db_healthy = db_status.get('status') == 'connected' if isinstance(db_status, dict) else False
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'agents_available': len(agents),
+            'vector_db_available': db_healthy,
+            'database_status': db_status,
+            'agents_count': len(agents)
+        })
+    except Exception as e:
+        logger.error(f"Health check error: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.now().isoformat(),
+            'agents_available': len(agents),
+            'vector_db_available': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    """Get application status"""
+    return jsonify({
+        'status': 'running',
+        'timestamp': datetime.now().isoformat(),
+        'database_status': vector_db.get_status(),
+        'agents_count': len(agents)
+    })
+
 if __name__ == '__main__':
     logger.info("Starting Vector RAG Database Application")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)

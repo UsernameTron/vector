@@ -5,6 +5,7 @@ class VectorRAGApp {
         this.currentAgent = null;
         this.agents = {};
         this.isLoading = false;
+        this.selectedFiles = [];
         
         this.init();
     }
@@ -31,6 +32,7 @@ class VectorRAGApp {
         
         // Document management
         document.getElementById('uploadDoc').addEventListener('click', () => this.uploadDocument());
+        document.getElementById('uploadFiles').addEventListener('click', () => this.uploadFiles());
         document.getElementById('searchDocs').addEventListener('click', () => this.searchDocuments());
         
         // Search on enter
@@ -39,6 +41,15 @@ class VectorRAGApp {
                 this.searchDocuments();
             }
         });
+        
+        // File upload drag and drop
+        this.setupFileUpload();
+        
+        // Ensure paste functionality for document content
+        document.getElementById('docContent').addEventListener('paste', (e) => {
+            // Allow default paste behavior
+            console.log('Paste event detected in document content');
+        });
     }
     
     async loadAgents() {
@@ -46,14 +57,10 @@ class VectorRAGApp {
             const response = await fetch('/api/agents');
             const data = await response.json();
             
-            // Convert agents array to object for compatibility
-            this.agents = {};
-            if (data.agents && Array.isArray(data.agents)) {
-                data.agents.forEach(agent => {
-                    this.agents[agent.id] = agent;
-                });
-            }
+            // Backend returns agents as direct object, not nested in agents property
+            this.agents = data;
             
+            console.log('Loaded agents:', this.agents);
             this.renderAgents();
         } catch (error) {
             console.error('Error loading agents:', error);
@@ -63,7 +70,14 @@ class VectorRAGApp {
     
     renderAgents() {
         const agentGrid = document.getElementById('agentGrid');
+        if (!agentGrid) {
+            console.error('Agent grid element not found!');
+            return;
+        }
+        
         agentGrid.innerHTML = '';
+        
+        console.log('Rendering agents:', Object.keys(this.agents));
         
         const agentIcons = {
             'research': 'fas fa-microscope',
@@ -220,14 +234,19 @@ class VectorRAGApp {
         this.setLoading(true);
         
         try {
-            const formData = new FormData();
-            const blob = new Blob([content], { type: 'text/plain' });
-            const file = new File([blob], `${title}.txt`, { type: 'text/plain' });
-            formData.append('file', file);
+            // Send as JSON to match backend expectations
+            const requestBody = {
+                title: title,
+                content: content,
+                source: source
+            };
             
-            const response = await fetch('/api/upload', {
+            const response = await fetch('/api/documents', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
             });
             
             const data = await response.json();
@@ -308,25 +327,40 @@ class VectorRAGApp {
     
     async loadDocuments() {
         try {
-            const response = await fetch('/api/status');
+            const response = await fetch('/api/documents');
             if (response.ok) {
-                const status = await response.json();
-                // Show basic document count from status
-                this.displayDocuments([]);
-                const documentList = document.getElementById('documentList');
-                if (documentList) {
-                    documentList.innerHTML = `
-                        <div style="color: var(--text-muted); text-align: center; padding: 1rem;">
-                            <i class="fas fa-database" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
-                            <p>Vector database ready for documents</p>
-                            <p>Upload documents using the form above</p>
-                        </div>
-                    `;
+                const documents = await response.json();
+                this.displayDocuments(documents);
+            } else {
+                // Fallback to status check
+                const statusResponse = await fetch('/api/status');
+                if (statusResponse.ok) {
+                    const status = await statusResponse.json();
+                    const documentList = document.getElementById('documentList');
+                    if (documentList) {
+                        const docCount = status.database_status?.document_count || 0;
+                        documentList.innerHTML = `
+                            <div style="color: var(--text-muted); text-align: center; padding: 1rem;">
+                                <i class="fas fa-database" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                                <p>Vector database contains ${docCount} documents</p>
+                                <p>Upload documents using the form above</p>
+                            </div>
+                        `;
+                    }
                 }
             }
         } catch (error) {
             console.error('Error loading documents:', error);
-            // Don't show error for documents - this is optional
+            const documentList = document.getElementById('documentList');
+            if (documentList) {
+                documentList.innerHTML = `
+                    <div style="color: var(--text-muted); text-align: center; padding: 1rem;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--warning-color);"></i>
+                        <p>Could not load documents</p>
+                        <p>Upload documents using the form above</p>
+                    </div>
+                `;
+            }
         }
     }
     
@@ -489,6 +523,181 @@ class VectorRAGApp {
                     notification.parentNode.removeChild(notification);
                 }
             }, 300);
+        });
+    }
+    
+    setupFileUpload() {
+        const fileInput = document.getElementById('docFile');
+        const fileLabel = document.querySelector('.file-upload-label');
+        
+        // File input change handler
+        fileInput.addEventListener('change', (e) => {
+            this.handleFileSelection(e.target.files);
+        });
+        
+        // Drag and drop handlers
+        fileLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileLabel.classList.add('drag-over');
+        });
+        
+        fileLabel.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileLabel.classList.remove('drag-over');
+        });
+        
+        fileLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileLabel.classList.remove('drag-over');
+            this.handleFileSelection(e.dataTransfer.files);
+        });
+    }
+    
+    handleFileSelection(files) {
+        this.selectedFiles = Array.from(files);
+        this.displaySelectedFiles();
+    }
+    
+    displaySelectedFiles() {
+        const fileUploadSection = document.getElementById('fileUploadSection');
+        
+        // Remove existing file list
+        const existingList = fileUploadSection.querySelector('.file-list');
+        if (existingList) {
+            existingList.remove();
+        }
+        
+        if (this.selectedFiles.length === 0) return;
+        
+        // Create file list
+        const fileList = document.createElement('div');
+        fileList.className = 'file-list';
+        
+        this.selectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            
+            fileItem.innerHTML = `
+                <div>
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${this.formatFileSize(file.size)}</div>
+                </div>
+                <button class="file-remove" onclick="app.removeFile(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            fileList.appendChild(fileItem);
+        });
+        
+        // Insert file list before the upload button
+        const uploadButton = document.getElementById('uploadFiles');
+        fileUploadSection.insertBefore(fileList, uploadButton);
+    }
+    
+    removeFile(index) {
+        this.selectedFiles.splice(index, 1);
+        this.displaySelectedFiles();
+    }
+    
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    switchUploadMode(mode) {
+        const fileTab = document.getElementById('fileTab');
+        const textTab = document.getElementById('textTab');
+        const fileSection = document.getElementById('fileUploadSection');
+        const textSection = document.getElementById('textUploadSection');
+        
+        if (mode === 'file') {
+            fileTab.classList.add('active');
+            textTab.classList.remove('active');
+            fileSection.style.display = 'block';
+            textSection.style.display = 'none';
+        } else {
+            fileTab.classList.remove('active');
+            textTab.classList.add('active');
+            fileSection.style.display = 'none';
+            textSection.style.display = 'block';
+        }
+    }
+    
+    async uploadFiles() {
+        if (!this.selectedFiles || this.selectedFiles.length === 0) {
+            this.showError('Please select files to upload.');
+            return;
+        }
+        
+        this.setLoading(true);
+        const source = document.getElementById('fileSource').value.trim() || 'file_upload';
+        
+        try {
+            const uploadPromises = this.selectedFiles.map(file => this.uploadSingleFile(file, source));
+            const results = await Promise.all(uploadPromises);
+            
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+            
+            if (successCount > 0) {
+                this.showSuccess(`Successfully uploaded ${successCount} file(s)${failCount > 0 ? `, ${failCount} failed` : ''}`);
+                
+                // Clear form
+                document.getElementById('docFile').value = '';
+                document.getElementById('fileSource').value = '';
+                this.selectedFiles = [];
+                this.displaySelectedFiles();
+                
+                // Reload documents
+                await this.loadDocuments();
+            } else {
+                this.showError('All file uploads failed.');
+            }
+        } catch (error) {
+            console.error('Error uploading files:', error);
+            this.showError('Failed to upload files.');
+        } finally {
+            this.setLoading(false);
+        }
+    }
+    
+    async uploadSingleFile(file, source) {
+        try {
+            const content = await this.readFileAsText(file);
+            const title = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
+            
+            const requestBody = {
+                title: title,
+                content: content,
+                source: source
+            };
+            
+            const response = await fetch('/api/documents', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            const data = await response.json();
+            return { success: response.ok, data, filename: file.name };
+        } catch (error) {
+            console.error(`Error uploading ${file.name}:`, error);
+            return { success: false, error, filename: file.name };
+        }
+    }
+    
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsText(file);
         });
     }
 }
