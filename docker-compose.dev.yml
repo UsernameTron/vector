@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Development application
+  vector-rag-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: vector-rag-dev
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=8000
+      - LOG_LEVEL=DEBUG
+      - CHROMA_PERSIST_DIRECTORY=/app/data/chroma_db
+    volumes:
+      - .:/app:cached
+      - dev_data:/app/data
+      - dev_logs:/app/logs
+    stdin_open: true
+    tty: true
+    networks:
+      - vector-rag-dev-network
+    depends_on:
+      - redis-dev
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: vector-rag-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - vector-rag-dev-network
+
+  # Development database UI (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: vector-rag-redis-ui
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis-dev:6379
+    depends_on:
+      - redis-dev
+    networks:
+      - vector-rag-dev-network
+    profiles:
+      - dev-tools
+
+volumes:
+  dev_data:
+    driver: local
+  dev_logs:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  vector-rag-dev-network:
+    driver: bridge
