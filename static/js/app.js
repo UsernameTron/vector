@@ -105,7 +105,7 @@ class VectorRAGApp {
                 </div>
                 <p class="agent-description">${agent.description}</p>
                 <ul class="agent-capabilities">
-                    ${agent.capabilities.map(cap => `<li>${cap}</li>`).join('')}
+                    ${(agent.capabilities || []).map(cap => `<li>${cap}</li>`).join('')}
                 </ul>
             `;
             

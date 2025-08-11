@@ -71,9 +71,40 @@ def get_agents():
         }
     return jsonify(agent_info)
 
-@app.route('/api/chat/<agent_name>', methods=['POST'])
-def chat_with_agent(agent_name):
+@app.route('/api/chat', methods=['POST'])
+def chat_with_agent():
     """Chat with a specific agent"""
+    try:
+        data = request.get_json()
+        agent_name = data.get('agent', '')
+        message = data.get('message', '')
+        
+        if not agent_name:
+            return jsonify({'error': 'Agent name is required'}), 400
+            
+        if agent_name not in agents:
+            return jsonify({'error': 'Agent not found'}), 404
+        
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+        
+        agent = agents[agent_name]
+        response = agent.process_query(message)
+        
+        return jsonify({
+            'agent': agent_name,
+            'query': message,
+            'response': response,
+            'timestamp': datetime.now().isoformat()
+        })
+    
+    except Exception as e:
+        logger.error(f"Error in chat: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chat/<agent_name>', methods=['POST'])
+def chat_with_agent_legacy(agent_name):
+    """Legacy chat endpoint for backwards compatibility"""
     try:
         if agent_name not in agents:
             return jsonify({'error': 'Agent not found'}), 404
@@ -204,4 +235,4 @@ def get_status():
 
 if __name__ == '__main__':
     logger.info("Starting Vector RAG Database Application")
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
