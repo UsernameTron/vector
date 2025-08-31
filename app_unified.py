@@ -373,6 +373,73 @@ class VectorRAGApplication:
                 self.logger.error(f"Upload error: {e}")
                 return jsonify({'error': 'Upload failed'}), 500
         
+        # Excel file upload endpoint
+        @self.app.route('/api/upload/excel', methods=['POST'])
+        def upload_excel():
+            return self._handle_file_upload('excel')
+        
+        # CSV file upload endpoint
+        @self.app.route('/api/upload/csv', methods=['POST'])
+        def upload_csv():
+            return self._handle_file_upload('csv')
+        
+        # Documents list endpoint
+        @self.app.route('/api/documents')
+        def get_documents():
+            try:
+                if self.vector_db:
+                    # Try to get all documents
+                    if hasattr(self.vector_db, 'get_all_documents'):
+                        documents = self.vector_db.get_all_documents()
+                        return jsonify(documents)
+                    else:
+                        # Fallback to basic info
+                        count = self.vector_db.get_document_count() if hasattr(self.vector_db, 'get_document_count') else 0
+                        return jsonify({
+                            'documents': [],
+                            'count': count,
+                            'message': 'Document listing not fully supported'
+                        })
+                else:
+                    return jsonify({'documents': [], 'message': 'Vector database not available'})
+            except Exception as e:
+                self.logger.error(f"Error getting documents: {e}")
+                return jsonify({'error': 'Failed to retrieve documents'}), 500
+        
+        # Document upload endpoint (for text documents)
+        @self.app.route('/api/documents', methods=['POST'])
+        def upload_document():
+            if not request.is_json:
+                return jsonify({'error': 'Request must be JSON'}), 400
+            
+            data = request.get_json()
+            title = data.get('title', 'Untitled')
+            content = data.get('content')
+            source = data.get('source', 'manual_upload')
+            
+            if not content:
+                return jsonify({'error': 'Content is required'}), 400
+            
+            if not content.strip():
+                return jsonify({'error': 'Content cannot be empty'}), 400
+            
+            try:
+                if self.vector_db:
+                    doc_id = self.vector_db.add_document(content, title, source)
+                else:
+                    doc_id = f"doc_{self._current_timestamp()}"
+                
+                return jsonify({
+                    'success': True,
+                    'document_id': doc_id,
+                    'title': title,
+                    'timestamp': self._current_timestamp()
+                })
+                
+            except Exception as e:
+                self.logger.error(f"Document upload error: {e}")
+                return jsonify({'error': 'Failed to upload document'}), 500
+        
         # Status endpoint
         @self.app.route('/api/status')
         def status():
@@ -394,6 +461,69 @@ class VectorRAGApplication:
                 'timestamp': self._current_timestamp()
             })
         
+        # Debug endpoint
+        @self.app.route('/debug')
+        def debug():
+            return f'''
+            <!DOCTYPE html>
+            <html>
+            <head><title>Debug Interface</title></head>
+            <body>
+                <h1>Vector RAG Debug Interface</h1>
+                <div id="debug-output"></div>
+                <script>
+                console.log('Debug page loaded');
+                
+                async function testAll() {{
+                    const output = document.getElementById('debug-output');
+                    
+                    try {{
+                        output.innerHTML += '<h2>Testing Agents API</h2>';
+                        const response = await fetch('/api/agents');
+                        const data = await response.json();
+                        
+                        output.innerHTML += `<p>✅ Status: ${{response.status}}</p>`;
+                        output.innerHTML += `<p>✅ Agents loaded: ${{data.agents?.length || 0}}</p>`;
+                        
+                        if (data.agents) {{
+                            output.innerHTML += '<h3>Agents:</h3><ul>';
+                            data.agents.forEach(agent => {{
+                                output.innerHTML += `<li>${{agent.name}} (ID: ${{agent.id}})</li>`;
+                            }});
+                            output.innerHTML += '</ul>';
+                        }}
+                        
+                        // Test element access
+                        output.innerHTML += '<h2>Testing DOM Elements</h2>';
+                        const agentGrid = document.getElementById('agentGrid');
+                        output.innerHTML += `<p>agentGrid element: ${{agentGrid ? '✅ Found' : '❌ Not found'}}</p>`;
+                        
+                    }} catch (error) {{
+                        output.innerHTML += `<p>❌ Error: ${{error.message}}</p>`;
+                        console.error('Debug error:', error);
+                    }}
+                }}
+                
+                testAll();
+                </script>
+                <div id="agentGrid">Test Grid Element</div>
+            </body>
+            </html>
+            '''
+        
+        # Comprehensive frontend test route
+        @self.app.route('/test-frontend')
+        def test_frontend():
+            try:
+                with open('test_frontend_debug.html', 'r') as f:
+                    return f.read()
+            except FileNotFoundError:
+                return '''
+                <h1>Test file not found</h1>
+                <p>The comprehensive frontend test file is not available.</p>
+                <p><a href="/debug">Try the basic debug page instead</a></p>
+                '''
+        
         # Root route
         @self.app.route('/')
         def index():
@@ -412,6 +542,92 @@ class VectorRAGApplication:
         """Get current timestamp in ISO format"""
         from datetime import datetime
         return datetime.now().isoformat()
+    
+    def _handle_file_upload(self, file_type: str):
+        """Handle Excel and CSV file uploads with multipart/form-data"""
+        try:
+            # Check if file is present
+            if 'file' not in request.files:
+                return jsonify({'error': 'No file provided'}), 400
+            
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            
+            # Validate file extension
+            filename = file.filename.lower()
+            if file_type == 'excel' and not any(filename.endswith(ext) for ext in ['.xlsx', '.xls', '.xlsm']):
+                return jsonify({'error': 'Invalid Excel file format. Supported: .xlsx, .xls, .xlsm'}), 400
+            elif file_type == 'csv' and not any(filename.endswith(ext) for ext in ['.csv', '.tsv', '.txt']):
+                return jsonify({'error': 'Invalid CSV file format. Supported: .csv, .tsv, .txt'}), 400
+            
+            # Read file content
+            file_content = file.read()
+            
+            # Get optional parameters from form data
+            source = request.form.get('source', f'{file_type}_upload')
+            
+            # Parse the file using our file parser
+            sys.path.insert(0, os.path.join(current_dir, 'src'))
+            from src.utils.file_parser import parse_uploaded_file, FileParsingError
+            
+            try:
+                documents, parsing_stats = parse_uploaded_file(file_content, file.filename, source)
+                
+                if not documents:
+                    return jsonify({
+                        'error': 'No documents could be extracted from the file',
+                        'parsing_stats': parsing_stats
+                    }), 400
+                
+                # Add documents to vector database
+                document_ids = []
+                if self.vector_db:
+                    for doc in documents:
+                        try:
+                            # VectorDatabase.add_document doesn't accept metadata directly,
+                            # so we'll append key metadata to the content
+                            enhanced_content = doc['content']
+                            if doc.get('metadata'):
+                                meta = doc['metadata']
+                                if meta.get('sheet_name'):
+                                    enhanced_content = f"[Sheet: {meta['sheet_name']}] " + enhanced_content
+                                if meta.get('row_index') is not None:
+                                    enhanced_content = f"[Row: {meta['row_index']+1}] " + enhanced_content
+                            
+                            doc_id = self.vector_db.add_document(
+                                content=enhanced_content,
+                                title=doc['title'],
+                                source=doc['source']
+                            )
+                            document_ids.append(doc_id)
+                        except Exception as e:
+                            self.logger.warning(f"Failed to add document to vector DB: {e}")
+                            continue
+                else:
+                    # Fallback when vector DB is not available
+                    document_ids = [doc['id'] for doc in documents]
+                
+                self.logger.info(f"Successfully processed {file.filename}: {len(documents)} documents, {len(document_ids)} added to vector DB")
+                
+                return jsonify({
+                    'success': True,
+                    'filename': file.filename,
+                    'file_type': file_type,
+                    'documents_processed': len(documents),
+                    'documents_stored': len(document_ids),
+                    'document_ids': document_ids,
+                    'parsing_stats': parsing_stats,
+                    'timestamp': self._current_timestamp()
+                })
+                
+            except FileParsingError as e:
+                self.logger.error(f"File parsing error for {file.filename}: {e}")
+                return jsonify({'error': f'File parsing failed: {str(e)}'}), 400
+            
+        except Exception as e:
+            self.logger.error(f"File upload error: {e}")
+            return jsonify({'error': 'File upload failed'}), 500
     
     def run(self, **kwargs):
         """Run the application"""

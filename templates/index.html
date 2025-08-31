@@ -37,7 +37,128 @@
                     AI Agent Command Center
                 </h2>
                 <div class="agent-grid" id="agentGrid">
-                    <!-- Agents will be loaded dynamically -->
+                    <!-- Server-side rendered agents as fallback -->
+                    <div class="agent-card fallback-agent" data-agent-key="research">
+                        <div class="agent-header">
+                            <div class="agent-icon">
+                                <i class="fas fa-microscope"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h3>Research Agent</h3>
+                                <div class="role">Senior Research Analyst</div>
+                            </div>
+                        </div>
+                        <p class="agent-description">Specializes in conducting thorough research, data analysis, and providing insights from various sources.</p>
+                        <ul class="agent-capabilities">
+                            <li>Document analysis and synthesis</li>
+                            <li>Market research and competitive analysis</li>
+                            <li>Data interpretation and visualization</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="agent-card fallback-agent" data-agent-key="ceo">
+                        <div class="agent-header">
+                            <div class="agent-icon">
+                                <i class="fas fa-crown"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h3>CEO Agent</h3>
+                                <div class="role">Chief Executive Officer</div>
+                            </div>
+                        </div>
+                        <p class="agent-description">Provides strategic leadership, high-level decision making, and executive insights.</p>
+                        <ul class="agent-capabilities">
+                            <li>Strategic planning and vision setting</li>
+                            <li>Executive decision making</li>
+                            <li>Business model optimization</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="agent-card fallback-agent" data-agent-key="performance">
+                        <div class="agent-header">
+                            <div class="agent-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h3>Performance Agent</h3>
+                                <div class="role">Performance Optimization Specialist</div>
+                            </div>
+                        </div>
+                        <p class="agent-description">Analyzes performance metrics, identifies optimization opportunities, and drives efficiency improvements.</p>
+                        <ul class="agent-capabilities">
+                            <li>Performance metrics analysis</li>
+                            <li>KPI development and tracking</li>
+                            <li>Process optimization</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="agent-card fallback-agent" data-agent-key="coaching">
+                        <div class="agent-header">
+                            <div class="agent-icon">
+                                <i class="fas fa-user-graduate"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h3>Coaching Agent</h3>
+                                <div class="role">Executive Coach & Development Specialist</div>
+                            </div>
+                        </div>
+                        <p class="agent-description">Provides personalized coaching, skill development guidance, and leadership mentoring.</p>
+                        <ul class="agent-capabilities">
+                            <li>Leadership coaching and mentoring</li>
+                            <li>Skill assessment and development planning</li>
+                            <li>Career guidance and progression</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="agent-card fallback-agent" data-agent-key="business_intelligence">
+                        <div class="agent-header">
+                            <div class="agent-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h3>Business Intelligence Agent</h3>
+                                <div class="role">Business Intelligence Director</div>
+                            </div>
+                        </div>
+                        <p class="agent-description">Analyzes business data, generates insights, and provides intelligence for strategic decision making.</p>
+                        <ul class="agent-capabilities">
+                            <li>Data analytics and visualization</li>
+                            <li>Business intelligence reporting</li>
+                            <li>Predictive modeling and forecasting</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="agent-card fallback-agent" data-agent-key="contact_center">
+                        <div class="agent-header">
+                            <div class="agent-icon">
+                                <i class="fas fa-headset"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h3>Contact Center Director Agent</h3>
+                                <div class="role">Contact Center Director</div>
+                            </div>
+                        </div>
+                        <p class="agent-description">Manages contact center operations, customer experience optimization, and service quality assurance.</p>
+                        <ul class="agent-capabilities">
+                            <li>Contact center operations management</li>
+                            <li>Customer experience optimization</li>
+                            <li>Quality assurance and monitoring</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Debug Status ---> 
+                <div id="debugStatus" style="background: #fffacd; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+                    <strong>Debug Status:</strong>
+                    <div id="debugInfo">Initializing...</div>
+                </div>
+                
+                <!-- Debug Panel -->
+                <div id="debugPanel" style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; font-family: monospace; font-size: 12px; display: none;">
+                    <strong>Debug Information:</strong>
+                    <div id="debugOutput"></div>
+                    <button onclick="testAgentsAPI()" style="margin: 5px;">Test Agents API</button>
+                    <button onclick="toggleDebug()" style="margin: 5px;">Toggle Debug</button>
                 </div>
             </section>
 
@@ -96,10 +217,10 @@
                         <!-- File Upload Section -->
                         <div id="fileUploadSection" class="upload-section">
                             <div class="form-group">
-                                <input type="file" id="docFile" accept=".txt,.md,.pdf,.doc,.docx" multiple>
+                                <input type="file" id="docFile" accept=".txt,.md,.pdf,.doc,.docx,.xlsx,.xls,.xlsm,.csv,.tsv" multiple>
                                 <label for="docFile" class="file-upload-label">
                                     <i class="fas fa-cloud-upload-alt"></i>
-                                    Choose files or drag and drop
+                                    Choose files or drag and drop (Excel, CSV, Text, PDF)
                                 </label>
                             </div>
                             <div class="form-group">
@@ -161,7 +282,83 @@
         </div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- Debug JavaScript -->
+    <script>
+        let debugEnabled = false;
+        
+        function debugLog(message) {
+            console.log('[DEBUG]', message);
+            if (debugEnabled) {
+                const output = document.getElementById('debugOutput');
+                if (output) {
+                    output.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+                }
+            }
+        }
+        
+        function toggleDebug() {
+            debugEnabled = !debugEnabled;
+            const panel = document.getElementById('debugPanel');
+            if (panel) {
+                panel.style.display = debugEnabled ? 'block' : 'none';
+            }
+            debugLog('Debug panel toggled: ' + (debugEnabled ? 'ON' : 'OFF'));
+        }
+        
+        async function testAgentsAPI() {
+            debugLog('Testing agents API...');
+            try {
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                debugLog(`Agents API response: ${response.status}, Agents: ${data.agents?.length || 0}`);
+                
+                // Try to render agents manually
+                const agentGrid = document.getElementById('agentGrid');
+                if (agentGrid && data.agents) {
+                    let html = '';
+                    data.agents.forEach(agent => {
+                        html += `<div style="border: 1px solid #ccc; padding: 10px; margin: 5px; border-radius: 5px;">
+                            <h4>${agent.name}</h4>
+                            <p>${agent.description}</p>
+                            <button onclick="selectAgent('${agent.id}')">Select Agent</button>
+                        </div>`;
+                    });
+                    agentGrid.innerHTML = html;
+                    debugLog('Manually rendered agents');
+                } else {
+                    debugLog('No agentGrid element or no agents data');
+                }
+                
+            } catch (error) {
+                debugLog('API test failed: ' + error.message);
+            }
+        }
+        
+        function selectAgent(agentId) {
+            debugLog('Agent selected: ' + agentId);
+            // Enable chat
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            if (messageInput) messageInput.disabled = false;
+            if (sendButton) sendButton.disabled = false;
+            
+            const agentName = document.getElementById('currentAgentName');
+            if (agentName) agentName.textContent = 'Agent: ' + agentId;
+        }
+        
+        // Auto-enable debug after 3 seconds if agents don't load
+        setTimeout(() => {
+            const agentGrid = document.getElementById('agentGrid');
+            if (agentGrid && agentGrid.children.length <= 1) {
+                debugLog('Agents not loaded after 3 seconds, enabling debug panel');
+                toggleDebug();
+            }
+        }, 3000);
+        
+        debugLog('Debug system initialized');
+    </script>
+    
+    <!-- Main JavaScript -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

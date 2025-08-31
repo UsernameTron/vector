@@ -11,10 +11,41 @@ class VectorRAGApp {
     }
     
     async init() {
-        this.setupEventListeners();
-        await this.loadAgents();
-        await this.loadDocuments();
-        this.updateStatus();
+        console.log('VectorRAGApp initializing...');
+        this.updateDebugInfo('VectorRAGApp initializing...');
+        try {
+            this.setupEventListeners();
+            console.log('Event listeners setup complete');
+            this.updateDebugInfo('Event listeners setup complete');
+            
+            console.log('Loading agents...');
+            this.updateDebugInfo('Loading agents...');
+            try {
+                await this.loadAgents();
+                console.log('Agents loaded, count:', Object.keys(this.agents).length);
+                this.updateDebugInfo(`Agents loaded, count: ${Object.keys(this.agents).length}`);
+            } catch (error) {
+                console.error('Failed to load agents, using fallback:', error);
+                this.updateDebugInfo(`⚠️ Failed to load agents from API, using fallback: ${error.message}`);
+                // Ensure fallback agents are still made interactive
+                this.renderAgents();
+            }
+            
+            console.log('Loading documents...');
+            this.updateDebugInfo('Loading documents...');
+            await this.loadDocuments();
+            console.log('Documents loaded');
+            this.updateDebugInfo('Documents loaded');
+            
+            console.log('Updating status...');
+            this.updateDebugInfo('Updating status...');
+            this.updateStatus();
+            console.log('VectorRAGApp initialization complete');
+            this.updateDebugInfo('✅ VectorRAGApp initialization complete');
+        } catch (error) {
+            console.error('Error during initialization:', error);
+            this.updateDebugInfo(`❌ Error during initialization: ${error.message}`);
+        }
     }
     
     setupEventListeners() {
@@ -54,16 +85,33 @@ class VectorRAGApp {
     
     async loadAgents() {
         try {
+            this.updateDebugInfo('Fetching /api/agents...');
             const response = await fetch('/api/agents');
-            const data = await response.json();
+            this.updateDebugInfo(`API response status: ${response.status}`);
             
-            // Backend returns agents as direct object, not nested in agents property
-            this.agents = data;
+            const data = await response.json();
+            this.updateDebugInfo(`API data received: ${JSON.stringify(data, null, 2).substring(0, 200)}...`);
+            
+            // Backend returns agents in an 'agents' property as an array
+            if (data.agents && Array.isArray(data.agents)) {
+                // Convert array to object keyed by agent ID
+                this.agents = {};
+                data.agents.forEach(agent => {
+                    this.agents[agent.id] = agent;
+                });
+                this.updateDebugInfo(`✅ Processed ${data.agents.length} agents from API`);
+            } else {
+                // Fallback if structure is different
+                this.agents = data.agents || data || {};
+                this.updateDebugInfo('⚠️ Using fallback agent processing');
+            }
             
             console.log('Loaded agents:', this.agents);
+            this.updateDebugInfo(`Agent keys: ${Object.keys(this.agents).join(', ')}`);
             this.renderAgents();
         } catch (error) {
             console.error('Error loading agents:', error);
+            this.updateDebugInfo(`❌ Error loading agents: ${error.message}`);
             this.showError('Failed to load AI agents');
         }
     }
@@ -72,13 +120,55 @@ class VectorRAGApp {
         const agentGrid = document.getElementById('agentGrid');
         if (!agentGrid) {
             console.error('Agent grid element not found!');
+            this.updateDebugInfo('❌ Agent grid element not found!');
             return;
         }
         
-        agentGrid.innerHTML = '';
+        // Check if fallback agents are present
+        const fallbackAgents = agentGrid.querySelectorAll('.fallback-agent');
+        if (fallbackAgents.length > 0) {
+            console.log('Found fallback agents, making them interactive...');
+            this.updateDebugInfo(`✅ Found ${fallbackAgents.length} fallback agents, making them interactive...`);
+            this.setupFallbackAgents(fallbackAgents);
+        }
         
-        console.log('Rendering agents:', Object.keys(this.agents));
+        // If we have dynamic agent data, replace fallback agents
+        if (Object.keys(this.agents).length > 0) {
+            console.log('Rendering dynamic agents:', Object.keys(this.agents));
+            this.updateDebugInfo(`Rendering ${Object.keys(this.agents).length} dynamic agents...`);
+            
+            // Clear existing content
+            agentGrid.innerHTML = '';
+            this.renderDynamicAgents(agentGrid);
+        } else {
+            this.updateDebugInfo('⚠️ No dynamic agent data, using fallback agents');
+        }
+    }
+    
+    setupFallbackAgents(fallbackAgents) {
+        // Make fallback agents clickable
+        fallbackAgents.forEach(agentElement => {
+            const agentKey = agentElement.dataset.agentKey;
+            const agentName = agentElement.querySelector('h3').textContent;
+            
+            // Create a minimal agent object for fallback
+            const fallbackAgentData = {
+                id: agentKey,
+                name: agentName,
+                role: agentElement.querySelector('.role').textContent
+            };
+            
+            agentElement.addEventListener('click', () => {
+                this.selectAgent(agentKey, fallbackAgentData);
+            });
+            
+            agentElement.style.cursor = 'pointer';
+        });
         
+        this.updateDebugInfo(`✅ Made ${fallbackAgents.length} fallback agents interactive`);
+    }
+    
+    renderDynamicAgents(agentGrid) {
         const agentIcons = {
             'research': 'fas fa-microscope',
             'ceo': 'fas fa-crown',
@@ -89,6 +179,7 @@ class VectorRAGApp {
         };
         
         Object.entries(this.agents).forEach(([key, agent]) => {
+            this.updateDebugInfo(`Creating card for agent: ${agent.name} (${key})`);
             const agentCard = document.createElement('div');
             agentCard.className = 'agent-card';
             agentCard.dataset.agentKey = key;
@@ -112,6 +203,8 @@ class VectorRAGApp {
             agentCard.addEventListener('click', () => this.selectAgent(key, agent));
             agentGrid.appendChild(agentCard);
         });
+        
+        this.updateDebugInfo(`✅ Rendered ${Object.keys(this.agents).length} dynamic agent cards to DOM`);
     }
     
     selectAgent(agentKey, agent) {
@@ -526,6 +619,20 @@ class VectorRAGApp {
         });
     }
     
+    updateDebugInfo(message) {
+        const debugInfo = document.getElementById('debugInfo');
+        if (debugInfo) {
+            const timestamp = new Date().toLocaleTimeString();
+            debugInfo.innerHTML += `<div>${timestamp}: ${message}</div>`;
+            // Keep only last 20 messages to prevent overflow
+            const lines = debugInfo.children;
+            if (lines.length > 20) {
+                debugInfo.removeChild(lines[0]);
+            }
+        }
+        console.log('DEBUG:', message);
+    }
+    
     setupFileUpload() {
         const fileInput = document.getElementById('docFile');
         const fileLabel = document.querySelector('.file-upload-label');
@@ -555,6 +662,8 @@ class VectorRAGApp {
     
     handleFileSelection(files) {
         this.selectedFiles = Array.from(files);
+        this.updateDebugInfo(`📁 Selected ${files.length} files: ${Array.from(files).map(f => f.name).join(', ')}`);
+        console.log('Files selected:', this.selectedFiles);
         this.displaySelectedFiles();
     }
     
@@ -577,9 +686,29 @@ class VectorRAGApp {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
             
+            // Determine file type icon
+            const ext = file.name.split('.').pop().toLowerCase();
+            let fileIcon = 'fa-file'; // default
+            let fileColor = ''; // default color
+            if (['xlsx', 'xls', 'xlsm'].includes(ext)) {
+                fileIcon = 'fa-file-excel';
+                fileColor = 'style="color: #1D6F42;"'; // Excel green
+            } else if (['csv', 'tsv'].includes(ext)) {
+                fileIcon = 'fa-file-csv';
+                fileColor = 'style="color: #0066CC;"'; // CSV blue
+            } else if (['txt', 'md'].includes(ext)) {
+                fileIcon = 'fa-file-alt';
+            } else if (['pdf'].includes(ext)) {
+                fileIcon = 'fa-file-pdf';
+                fileColor = 'style="color: #DC382D;"'; // PDF red
+            } else if (['doc', 'docx'].includes(ext)) {
+                fileIcon = 'fa-file-word';
+                fileColor = 'style="color: #2B579A;"'; // Word blue
+            }
+            
             fileItem.innerHTML = `
                 <div>
-                    <div class="file-name">${file.name}</div>
+                    <div class="file-name"><i class="fas ${fileIcon}" ${fileColor}></i> ${file.name}</div>
                     <div class="file-size">${this.formatFileSize(file.size)}</div>
                 </div>
                 <button class="file-remove" onclick="app.removeFile(${index})">
@@ -628,11 +757,16 @@ class VectorRAGApp {
     }
     
     async uploadFiles() {
+        this.updateDebugInfo(`🚀 Upload button clicked. Selected files: ${this.selectedFiles ? this.selectedFiles.length : 'none'}`);
+        console.log('Upload files called, selectedFiles:', this.selectedFiles);
+        
         if (!this.selectedFiles || this.selectedFiles.length === 0) {
+            this.updateDebugInfo('❌ No files selected for upload');
             this.showError('Please select files to upload.');
             return;
         }
         
+        this.updateDebugInfo(`📤 Starting upload of ${this.selectedFiles.length} files...`);
         this.setLoading(true);
         const source = document.getElementById('fileSource').value.trim() || 'file_upload';
         
@@ -644,7 +778,19 @@ class VectorRAGApp {
             const failCount = results.length - successCount;
             
             if (successCount > 0) {
-                this.showSuccess(`Successfully uploaded ${successCount} file(s)${failCount > 0 ? `, ${failCount} failed` : ''}`);
+                // Calculate total documents processed for Excel/CSV files
+                const totalDocsProcessed = results.reduce((sum, r) => 
+                    sum + (r.documentsProcessed || 0), 0);
+                
+                let successMessage = `Successfully uploaded ${successCount} file(s)`;
+                if (totalDocsProcessed > 0) {
+                    successMessage += ` (${totalDocsProcessed} documents processed)`;
+                }
+                if (failCount > 0) {
+                    successMessage += `, ${failCount} failed`;
+                }
+                
+                this.showSuccess(successMessage);
                 
                 // Clear form
                 document.getElementById('docFile').value = '';
@@ -667,25 +813,66 @@ class VectorRAGApp {
     
     async uploadSingleFile(file, source) {
         try {
-            const content = await this.readFileAsText(file);
-            const title = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
+            this.updateDebugInfo(`📄 Processing file: ${file.name} (${this.formatFileSize(file.size)})`);
             
-            const requestBody = {
-                title: title,
-                content: content,
-                source: source
-            };
+            // Determine file type based on extension
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            const excelExtensions = ['xlsx', 'xls', 'xlsm'];
+            const csvExtensions = ['csv', 'tsv'];
             
-            const response = await fetch('/api/documents', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+            this.updateDebugInfo(`🔍 File extension: ${fileExtension}`);
             
-            const data = await response.json();
-            return { success: response.ok, data, filename: file.name };
+            // Check if it's Excel or CSV file
+            if (excelExtensions.includes(fileExtension) || csvExtensions.includes(fileExtension)) {
+                // Upload as Excel/CSV using multipart form data
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('source', source);
+                
+                // Determine endpoint based on file type
+                const endpoint = excelExtensions.includes(fileExtension) 
+                    ? '/api/upload/excel' 
+                    : '/api/upload/csv';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Upload failed');
+                }
+                
+                const data = await response.json();
+                return { 
+                    success: true, 
+                    file: file.name,
+                    documentsProcessed: data.documents_processed,
+                    documentsStored: data.documents_stored
+                };
+            } else {
+                // For text files, use the old method
+                const content = await this.readFileAsText(file);
+                const title = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
+                
+                const requestBody = {
+                    title: title,
+                    content: content,
+                    source: source
+                };
+                
+                const response = await fetch('/api/documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+                return { success: response.ok, data, filename: file.name };
+            }
         } catch (error) {
             console.error(`Error uploading ${file.name}:`, error);
             return { success: false, error, filename: file.name };
@@ -704,10 +891,18 @@ class VectorRAGApp {
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new VectorRAGApp();
-    
-    // Update status every 30 seconds
-    setInterval(() => {
-        window.app.updateStatus();
-    }, 30000);
+    console.log('DOM Content Loaded, creating VectorRAGApp...');
+    try {
+        window.app = new VectorRAGApp();
+        console.log('VectorRAGApp created successfully');
+        
+        // Update status every 30 seconds
+        setInterval(() => {
+            window.app.updateStatus();
+        }, 30000);
+    } catch (error) {
+        console.error('Failed to create VectorRAGApp:', error);
+    }
 });
+
+console.log('VectorRAG JavaScript loaded');
