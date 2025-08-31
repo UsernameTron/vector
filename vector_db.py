@@ -151,3 +151,11 @@ class VectorDatabase:
                 'status': 'error',
                 'error': str(e)
             }
+    
+    def get_document_count(self) -> int:
+        """Get the total number of documents in the collection"""
+        try:
+            return self.collection.count()
+        except Exception as e:
+            logger.error(f"Error getting document count: {str(e)}")
+            return 0

@@ -174,6 +174,19 @@ class ProductionVectorRAG:
         
         # Store references
         app.vector_rag = self
+        
+        # Setup middleware
+        try:
+            from middleware.error_handlers import register_error_handlers
+            from middleware.validation import setup_validation_middleware
+            
+            register_error_handlers(app)
+            setup_validation_middleware(app)
+            logger.info("✅ Middleware registered successfully")
+        except ImportError as e:
+            logger.warning(f"⚠️ Middleware not available: {e}")
+        except Exception as e:
+            logger.error(f"❌ Failed to setup middleware: {e}")
         self.app = app
         
         # Register routes

@@ -22,6 +22,7 @@ class VectorRAGLauncher:
         self.server_process: Optional[subprocess.Popen] = None
         self.server_port = 5001
         self.server_url = f"http://localhost:{self.server_port}"
+        self.app_mode = "production"  # Default to production mode
         self.setup_ui()
         
     def setup_ui(self):
@@ -60,6 +61,30 @@ class VectorRAGLauncher:
             style="Subtitle.TLabel"
         )
         subtitle_label.pack(pady=(0, 20))
+        
+        # Configuration frame
+        config_frame = ttk.LabelFrame(main_frame, text="Configuration", padding="10")
+        config_frame.pack(fill="x", pady=(0, 10))
+        
+        # Mode selection
+        mode_label = ttk.Label(config_frame, text="Application Mode:")
+        mode_label.pack(anchor="w")
+        
+        mode_frame = ttk.Frame(config_frame)
+        mode_frame.pack(fill="x", pady=(5, 0))
+        
+        self.mode_var = tk.StringVar(value="production")
+        modes = [
+            ("Production", "production", "🚀 Full features with security"),
+            ("Development", "development", "🛠️ Debug mode with verbose logging"), 
+            ("Clean Architecture", "clean", "🏗️ Modern architecture with Swagger docs")
+        ]
+        
+        for i, (label, value, desc) in enumerate(modes):
+            rb = ttk.Radiobutton(mode_frame, text=f"{label} - {desc}", 
+                               variable=self.mode_var, value=value,
+                               command=self.on_mode_change)
+            rb.pack(anchor="w", pady=2)
         
         # Status frame
         status_frame = ttk.LabelFrame(main_frame, text="System Status", padding="10")
@@ -218,8 +243,8 @@ class VectorRAGLauncher:
         try:
             self.update_status("🚀 Starting Vector RAG Database server...")
             
-            # Check if app.py exists, prefer demo version for easy launch
-            app_files = ["app_demo.py", "app.py"]
+            # Use the new unified application
+            app_files = ["app_unified.py", "app_production.py", "app_demo.py", "app.py"]
             app_to_use = None
             
             for app_file in app_files:
@@ -235,17 +260,29 @@ class VectorRAGLauncher:
             try:
                 # Set environment variables for Flask
                 env = os.environ.copy()
-                env['FLASK_ENV'] = 'development'
+                env['FLASK_ENV'] = self.app_mode
                 env['FLASK_APP'] = app_to_use
                 
+                # Prepare command arguments based on app type
+                if app_to_use == "app_unified.py":
+                    # Use unified app with mode and port arguments
+                    cmd = [
+                        sys.executable, app_to_use, 
+                        "--mode", self.app_mode,
+                        "--host", "127.0.0.1",
+                        "--port", str(self.server_port)
+                    ]
+                else:
+                    # Legacy app files
+                    cmd = [sys.executable, app_to_use]
+                
                 # Start the server
-                self.server_process = subprocess.Popen([
-                    sys.executable, app_to_use
-                ], 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                env=env,
-                cwd=os.getcwd()
+                self.server_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    env=env,
+                    cwd=os.getcwd()
                 )
                 
                 # Give server time to start
@@ -344,6 +381,21 @@ class VectorRAGLauncher:
             self.update_status(f"❌ Error stopping system: {e}")
             self._reset_ui()
             
+    def on_mode_change(self):
+        """Handle application mode change"""
+        self.app_mode = self.mode_var.get()
+        self.update_status(f"Mode changed to: {self.app_mode}")
+        
+        # Update port based on mode for clean separation
+        if self.app_mode == "clean":
+            self.server_port = 8000
+        elif self.app_mode == "development":
+            self.server_port = 5000
+        else:
+            self.server_port = 5001
+            
+        self.server_url = f"http://localhost:{self.server_port}"
+        
     def _reset_ui(self):
         """Reset UI to initial state"""
         self.start_button.config(state="normal")

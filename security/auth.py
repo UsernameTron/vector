@@ -31,10 +31,19 @@ class APIKeyManager:
             raise ValueError("ENCRYPTION_SECRET environment variable not set")
         
         # Use PBKDF2 to derive a key from the secret
+        # Get salt from environment or generate a secure one
+        salt_env = os.getenv('ENCRYPTION_SALT')
+        if salt_env:
+            salt = base64.b64decode(salt_env.encode())
+        else:
+            # Generate and log warning about missing salt
+            salt = os.urandom(16)
+            logger.warning("ENCRYPTION_SALT not found in environment. Using randomly generated salt. This will cause decryption issues on restart!")
+        
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=b'vector_rag_salt',  # In production, use a random salt stored securely
+            salt=salt,
             iterations=100000,
         )
         key = base64.urlsafe_b64encode(kdf.derive(secret.encode()))

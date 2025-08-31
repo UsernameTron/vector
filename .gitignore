@@ -1,41 +1,18 @@
 # Vector RAG Database
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.development
+*.key
+*.pem
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual Environment
-venv/
-env/
-ENV/
-
-# Environment Variables
-.env
-
-# ChromaDB
-chroma_db/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-*.tmp
-*.temp
-
-# Node modules (if any)
-node_modules/
-
-# Distribution / packaging
+*.so
 .Python
 build/
 develop-eggs/
@@ -52,3 +29,85 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Database files
+chroma_db/
+chroma_db_backup_*/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+log/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Agent memory and uploads
+agent_memory/
+uploads/
+
+# Node modules (if any)
+node_modules/
+
+# Security and certificates
+*.crt
+*.cert
+*.ca-bundle
+*.p12
+*.p7b
+*.p7r
+*.srl
+*.pfx
+*.der
+
+# API keys and tokens
+*_api_key*
+*_token*
+*_secret*
