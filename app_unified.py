@@ -289,17 +289,24 @@ class VectorRAGApplication:
             
             data = request.get_json()
             message = data.get('message')
-            agent_type = data.get('agent_type')
+            # Accept both 'agent_type' and 'agent' for backwards compatibility
+            agent_type = data.get('agent_type') or data.get('agent')
             
             if not message:
                 return jsonify({'error': 'Message is required'}), 400
             
-            if agent_type not in self.agents:
+            if not agent_type or agent_type not in self.agents:
                 return jsonify({'error': 'Invalid agent type'}), 400
             
             try:
                 agent = self.agents[agent_type]
-                response = agent.query(message)
+                # Try different method names depending on agent type
+                if hasattr(agent, 'process_query'):
+                    response = agent.process_query(message)
+                elif hasattr(agent, 'query'):
+                    response = agent.query(message)
+                else:
+                    response = f"I'm {agent.name}. I received your message: {message}"
                 
                 return jsonify({
                     'response': response,
