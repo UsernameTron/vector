@@ -22,10 +22,12 @@ cp .env.template .env
 # Production server (recommended)
 python app_production.py  # Runs on port 5001
 
+# Clean architecture version
+python app_clean_architecture.py  # Clean architecture on port 8000
+
 # Development versions
 python app.py            # Basic Flask app on port 5000
 python app_demo.py       # Demo version
-python app_clean_architecture.py  # Clean architecture version on port 8000
 
 # Desktop launcher
 python desktop_launcher.py  # GUI launcher with status monitoring
@@ -33,14 +35,20 @@ python desktop_launcher.py  # GUI launcher with status monitoring
 
 ### Testing
 ```bash
-# Run tests (pytest available in requirements.txt)
+# Run all tests
 pytest
+
+# Run specific test file
+pytest tests/unit/test_file_parser.py
+
+# Run with verbose output
+pytest -v
 
 # Health check
 curl http://localhost:5001/health
 ```
 
-### Linting and Code Quality
+### Code Quality
 ```bash
 # Format code
 black .
@@ -53,16 +61,18 @@ flake8
 
 This is a **Vector RAG Database** application with specialized AI agents and document processing capabilities. The system uses multiple architectural patterns:
 
-### Main Architecture (Clean Architecture)
+### Clean Architecture Implementation
+Located in `src/` with proper separation of concerns:
 - **Domain Layer** (`src/domain/`): Business entities and interfaces
 - **Application Layer** (`src/application/services/`): Business logic services
 - **Infrastructure Layer** (`src/infrastructure/`): Data access, external services, dependency injection
 - **Presentation Layer** (`src/presentation/controllers/`): API controllers and responses
 
-### Key Components
+### Core Components
 
-**AI Agent System**: 6-8 specialized agents (Research, CEO, Performance, Coaching, Business Intelligence, Contact Center) with RAG capabilities
+**AI Agent System**: 8 specialized agents with RAG capabilities
 - Agent implementations in `agents.py`
+- Research, CEO, Performance, Coaching, Code Analyzer, Triage, Business Intelligence, Contact Center agents
 - Each agent has vector database integration via `VectorDatabase` class
 
 **Vector Database**: ChromaDB-based document storage and retrieval
@@ -80,6 +90,12 @@ This is a **Vector RAG Database** application with specialized AI agents and doc
 - **AIAgentService**: Agent interactions and context management
 - **FileProcessingService**: File upload handling and content extraction
 - **ChromaDocumentRepository**: Vector database data access layer
+
+### Dependency Injection
+Custom DI container in `src/infrastructure/container.py` supporting:
+- Singleton, Scoped, and Transient lifetimes
+- Automatic dependency resolution via type hints
+- Decorator-based registration
 
 ## Environment Configuration
 
@@ -102,6 +118,7 @@ All APIs return structured responses with `status`, `data`, `message`, `timestam
 - `/api/chat` - Chat with specific agent
 - `/api/documents` - Document management (Clean Architecture version)
 - `/api/search` - Vector search functionality
+- `/api/upload` - File upload endpoint
 
 ## File Organization Patterns
 
@@ -113,12 +130,12 @@ All APIs return structured responses with `status`, `data`, `message`, `timestam
 
 **Launcher System**: Desktop integration with GUI launcher (`desktop_launcher.py`) and shell scripts for cross-platform deployment.
 
-**Documentation**: Extensive documentation in `README.md`, `PRODUCTION_README.md`, `CLEAN_ARCHITECTURE.md` covering different deployment scenarios.
+**Testing Structure**: Tests organized under `tests/` with unit tests, API tests, and fixtures.
 
 ## Development Notes
 
-- **Dependency Injection**: Clean architecture version uses custom DI container (`src/infrastructure/container.py`)
-- **Testing**: Uses pytest framework - tests can be run with `pytest` command
+- **Dependency Injection**: Clean architecture version uses custom DI container
+- **Testing**: Uses pytest framework with fixtures in `tests/conftest.py`
 - **Vector Database**: Persists to `./chroma_db` directory by default
 - **Security**: Security setup available via `setup_security.py`
-- **Production**: WSGI deployment ready with Gunicorn configuration
+- **Production**: WSGI deployment ready with Gunicorn configuration in `gunicorn.conf.py`

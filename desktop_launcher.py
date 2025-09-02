@@ -386,14 +386,8 @@ class VectorRAGLauncher:
         self.app_mode = self.mode_var.get()
         self.update_status(f"Mode changed to: {self.app_mode}")
         
-        # Update port based on mode for clean separation
-        if self.app_mode == "clean":
-            self.server_port = 8000
-        elif self.app_mode == "development":
-            self.server_port = 5000
-        else:
-            self.server_port = 5001
-            
+        # Use consistent port 5001 for unified app regardless of mode
+        self.server_port = 5001
         self.server_url = f"http://localhost:{self.server_port}"
         
     def _reset_ui(self):

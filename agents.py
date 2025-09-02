@@ -49,7 +49,7 @@ class BaseAgent(ABC):
             messages.append({"role": "user", "content": user_query})
             
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4-turbo-preview",
                 messages=messages,
                 max_tokens=1000,
                 temperature=0.7

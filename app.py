@@ -6,6 +6,7 @@ Main application entry point with Flask backend
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import os
+import sys
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
@@ -201,6 +202,87 @@ def search_documents():
     except Exception as e:
         logger.error(f"Error searching documents: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/upload/csv', methods=['POST'])
+def upload_csv():
+    """Handle CSV file uploads with multipart/form-data"""
+    try:
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file extension
+        filename = file.filename.lower()
+        if not any(filename.endswith(ext) for ext in ['.csv', '.tsv', '.txt']):
+            return jsonify({'error': 'Invalid CSV file format. Supported: .csv, .tsv, .txt'}), 400
+        
+        # Read file content
+        file_content = file.read()
+        
+        # Get optional parameters from form data
+        source = request.form.get('source', 'csv_upload')
+        
+        # Parse the file using our file parser
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, os.path.join(current_dir, 'src'))
+        from src.utils.file_parser import parse_uploaded_file, FileParsingError
+        
+        try:
+            documents, parsing_stats = parse_uploaded_file(file_content, file.filename, source)
+            
+            if not documents:
+                return jsonify({
+                    'error': 'No documents could be extracted from the file',
+                    'parsing_stats': parsing_stats
+                }), 400
+            
+            # Add documents to vector database
+            document_ids = []
+            for doc in documents:
+                try:
+                    # VectorDatabase.add_document doesn't accept metadata directly,
+                    # so we'll append key metadata to the content
+                    enhanced_content = doc['content']
+                    if doc.get('metadata'):
+                        meta = doc['metadata']
+                        if meta.get('sheet_name'):
+                            enhanced_content = f"[Sheet: {meta['sheet_name']}] " + enhanced_content
+                        if meta.get('row_index') is not None:
+                            enhanced_content = f"[Row: {meta['row_index']+1}] " + enhanced_content
+                    
+                    doc_id = vector_db.add_document(
+                        enhanced_content,
+                        doc.get('title', file.filename),
+                        source
+                    )
+                    document_ids.append(doc_id)
+                except Exception as doc_error:
+                    logger.error(f"Error adding document: {doc_error}")
+                    # Continue processing other documents
+            
+            return jsonify({
+                'success': True,
+                'message': f'Successfully processed {len(document_ids)} documents from {file.filename}',
+                'documents_processed': len(documents),
+                'documents_stored': len(document_ids),
+                'document_ids': document_ids,
+                'parsing_stats': parsing_stats,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except FileParsingError as e:
+            logger.error(f"File parsing error: {e}")
+            return jsonify({'error': f'Failed to parse file: {str(e)}'}), 400
+            
+    except Exception as e:
+        logger.error(f"CSV upload error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Failed to upload CSV: {str(e)}'}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
