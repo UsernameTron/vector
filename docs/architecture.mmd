@@ -1,0 +1,77 @@
+graph TB
+    %% User Interface Layer
+    subgraph "User Interface"
+        UI[Web UI<br/>Flask Templates]
+        API[REST API<br/>Flask Routes]
+        CLI[CLI Tools<br/>Scripts]
+    end
+
+    %% Application Layer
+    subgraph "Application Layer"
+        AG[Agent Service<br/>8 AI Agents]
+        DS[Document Service]
+        FP[File Processing<br/>Service]
+        CS[Chunking Strategy<br/>*Partial*]
+    end
+
+    %% Infrastructure Layer
+    subgraph "Infrastructure Layer"
+        CD[ChromaDB<br/>Repository]
+        VS[Vector Store<br/>Interface]
+        ES[Event Publisher]
+        LS[Logging Service]
+        HM[Health Monitor]
+    end
+
+    %% External Services
+    subgraph "External Services"
+        OAI[OpenAI API<br/>GPT-4]
+        ST[Sentence<br/>Transformers]
+        CB[ChromaDB<br/>Vector Store]
+    end
+
+    %% Data Flow
+    UI --> API
+    CLI --> DS
+    API --> AG
+    API --> DS
+    AG --> OAI
+    DS --> FP
+    FP --> CS
+    CS --> CD
+    CD --> VS
+    VS --> CB
+    CB --> ST
+    
+    %% Monitoring
+    AG -.-> LS
+    DS -.-> LS
+    CD -.-> HM
+    VS -.-> ES
+
+    %% Missing Components (Dashed)
+    subgraph "Missing Components"
+        EV[Evaluation<br/>Framework]
+        ING[Ingestion<br/>Pipeline]
+        RR[Reranking<br/>Module]
+        HR[Hybrid<br/>Retrieval]
+        OB[Observability<br/>Stack]
+        CACHE[Embedding<br/>Cache]
+    end
+
+    style EV stroke-dasharray: 5 5
+    style ING stroke-dasharray: 5 5
+    style RR stroke-dasharray: 5 5
+    style HR stroke-dasharray: 5 5
+    style OB stroke-dasharray: 5 5
+    style CACHE stroke-dasharray: 5 5
+
+    %% Data Storage
+    subgraph "Data Storage"
+        FS[File System<br/>./chroma_db]
+        ENV[Environment<br/>Config]
+    end
+
+    CB --> FS
+    API --> ENV
+    AG --> ENV

@@ -28,6 +28,10 @@ bleach>=6.0.0
 openpyxl>=3.1.2
 xlrd>=2.0.1
 chardet>=5.0.0
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+beautifulsoup4>=4.11.0
+markdown>=3.4.0
 
 # File validation dependencies (optional but recommended)
 python-magic>=0.4.27
@@ -39,6 +43,22 @@ redis>=4.5.0
 
 # Form validation (optional)
 wtforms>=3.0.0
+
+# Retrieval and ranking dependencies
+rank-bm25>=0.2.2
+scipy>=1.10.0
+xxhash>=3.2.0
+
+# Observability dependencies
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-instrumentation-flask>=0.41b0
+opentelemetry-exporter-prometheus>=0.41b0
+structlog>=23.1.0
+
+# Resilience dependencies
+tenacity>=8.2.0
+pybreaker>=1.0.1
 
 # Development and testing (optional)
 pytest>=7.0.0
