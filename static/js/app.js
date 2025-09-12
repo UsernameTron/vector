@@ -11,18 +11,14 @@ class VectorRAGApp {
     }
     
     async init() {
-        console.log('VectorRAGApp initializing...');
         this.updateDebugInfo('VectorRAGApp initializing...');
         try {
             this.setupEventListeners();
-            console.log('Event listeners setup complete');
             this.updateDebugInfo('Event listeners setup complete');
             
-            console.log('Loading agents...');
             this.updateDebugInfo('Loading agents...');
             try {
                 await this.loadAgents();
-                console.log('Agents loaded, count:', Object.keys(this.agents).length);
                 this.updateDebugInfo(`Agents loaded, count: ${Object.keys(this.agents).length}`);
             } catch (error) {
                 console.error('Failed to load agents, using fallback:', error);
@@ -31,16 +27,12 @@ class VectorRAGApp {
                 this.renderAgents();
             }
             
-            console.log('Loading documents...');
             this.updateDebugInfo('Loading documents...');
             await this.loadDocuments();
-            console.log('Documents loaded');
             this.updateDebugInfo('Documents loaded');
             
-            console.log('Updating status...');
             this.updateDebugInfo('Updating status...');
             this.updateStatus();
-            console.log('VectorRAGApp initialization complete');
             this.updateDebugInfo('✅ VectorRAGApp initialization complete');
         } catch (error) {
             console.error('Error during initialization:', error);
@@ -79,7 +71,6 @@ class VectorRAGApp {
         // Ensure paste functionality for document content
         document.getElementById('docContent').addEventListener('paste', (e) => {
             // Allow default paste behavior
-            console.log('Paste event detected in document content');
         });
     }
     
@@ -106,7 +97,6 @@ class VectorRAGApp {
                 this.updateDebugInfo('⚠️ Using fallback agent processing');
             }
             
-            console.log('Loaded agents:', this.agents);
             this.updateDebugInfo(`Agent keys: ${Object.keys(this.agents).join(', ')}`);
             this.renderAgents();
         } catch (error) {
@@ -127,14 +117,12 @@ class VectorRAGApp {
         // Check if fallback agents are present
         const fallbackAgents = agentGrid.querySelectorAll('.fallback-agent');
         if (fallbackAgents.length > 0) {
-            console.log('Found fallback agents, making them interactive...');
             this.updateDebugInfo(`✅ Found ${fallbackAgents.length} fallback agents, making them interactive...`);
             this.setupFallbackAgents(fallbackAgents);
         }
         
         // If we have dynamic agent data, replace fallback agents
         if (Object.keys(this.agents).length > 0) {
-            console.log('Rendering dynamic agents:', Object.keys(this.agents));
             this.updateDebugInfo(`Rendering ${Object.keys(this.agents).length} dynamic agents...`);
             
             // Clear existing content
@@ -484,7 +472,6 @@ class VectorRAGApp {
     
     showDocumentDetails(docId) {
         // This could be expanded to show a modal with full document details
-        console.log('Show document details for:', docId);
         // For now, just highlight the document
         document.querySelectorAll('.doc-item, .search-result').forEach(item => {
             item.style.border = '1px solid var(--border-color)';
@@ -630,7 +617,6 @@ class VectorRAGApp {
                 debugInfo.removeChild(lines[0]);
             }
         }
-        console.log('DEBUG:', message);
     }
     
     setupFileUpload() {
@@ -663,7 +649,6 @@ class VectorRAGApp {
     handleFileSelection(files) {
         this.selectedFiles = Array.from(files);
         this.updateDebugInfo(`📁 Selected ${files.length} files: ${Array.from(files).map(f => f.name).join(', ')}`);
-        console.log('Files selected:', this.selectedFiles);
         this.displaySelectedFiles();
     }
     
@@ -758,7 +743,6 @@ class VectorRAGApp {
     
     async uploadFiles() {
         this.updateDebugInfo(`🚀 Upload button clicked. Selected files: ${this.selectedFiles ? this.selectedFiles.length : 'none'}`);
-        console.log('Upload files called, selectedFiles:', this.selectedFiles);
         
         if (!this.selectedFiles || this.selectedFiles.length === 0) {
             this.updateDebugInfo('❌ No files selected for upload');
@@ -891,10 +875,8 @@ class VectorRAGApp {
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM Content Loaded, creating VectorRAGApp...');
     try {
         window.app = new VectorRAGApp();
-        console.log('VectorRAGApp created successfully');
         
         // Update status every 30 seconds
         setInterval(() => {
@@ -905,4 +887,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('VectorRAG JavaScript loaded');

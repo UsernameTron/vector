@@ -23,33 +23,77 @@ class BaseAgent(ABC):
         self.capabilities = capabilities
         self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
     
+    def _limit_text(self, text: str, max_tokens: int = 8000) -> str:
+        """Limit text to prevent token overflow"""
+        # Rough estimate: 1 token ≈ 4 characters
+        max_chars = max_tokens * 4
+        
+        if len(text) <= max_chars:
+            return text
+        
+        # Try to truncate at sentence boundary
+        truncated = text[:max_chars]
+        last_period = truncated.rfind('.')
+        last_newline = truncated.rfind('\n')
+        
+        # Use the later of the two
+        break_point = max(last_period, last_newline)
+        if break_point > max_chars // 2:  # Only if it's not too early
+            truncated = text[:break_point + 1]
+        
+        return truncated + "\n\n[Content truncated due to length...]"
+
     def get_context(self, query: str, limit: int = 3) -> str:
-        """Retrieve relevant context from vector database"""
+        """Retrieve relevant context from vector database with token limiting"""
         try:
             results = self.vector_db.search(query, limit)
-            context = "\n\n".join([f"Document: {result['metadata'].get('title', 'Untitled')}\nContent: {result['content']}" for result in results])
-            return context
+            context_parts = []
+            total_chars = 0
+            max_context_chars = 20000  # ~5000 tokens total
+            
+            for result in results:
+                content = result.get('content', '')
+                title = result.get('metadata', {}).get('title', 'Untitled')
+                
+                # Limit each document to prevent overflow
+                if len(content) > 8000:  # ~2000 tokens per document
+                    content = self._limit_text(content, 2000)
+                
+                doc_text = f"Document: {title}\nContent: {content}"
+                
+                if total_chars + len(doc_text) > max_context_chars:
+                    break
+                
+                context_parts.append(doc_text)
+                total_chars += len(doc_text)
+            
+            return "\n\n".join(context_parts)
         except Exception as e:
             logger.error(f"Error getting context: {str(e)}")
             return ""
     
     def generate_response(self, system_prompt: str, user_query: str, context: str = "") -> str:
-        """Generate response using OpenAI GPT"""
+        """Generate response using OpenAI GPT with token limiting"""
         try:
+            # Limit inputs to prevent token overflow
+            limited_system_prompt = self._limit_text(system_prompt, 1000)
+            limited_user_query = self._limit_text(user_query, 15000)
+            limited_context = self._limit_text(context, 8000)
+            
             messages = [
-                {"role": "system", "content": system_prompt}
+                {"role": "system", "content": limited_system_prompt}
             ]
             
-            if context:
+            if limited_context:
                 messages.append({
                     "role": "system", 
-                    "content": f"Relevant context from knowledge base:\n{context}"
+                    "content": f"Relevant context from knowledge base:\n{limited_context}"
                 })
             
-            messages.append({"role": "user", "content": user_query})
+            messages.append({"role": "user", "content": limited_user_query})
             
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-4o-mini",
                 messages=messages,
                 max_tokens=1000,
                 temperature=0.7

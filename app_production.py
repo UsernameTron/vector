@@ -38,8 +38,8 @@ try:
     
     FULL_SYSTEM_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️  Full system components not available: {e}")
-    print("📝 Creating simplified version with local components...")
+    logger.warning(f"Full system components not available: {e}")
+    logger.info("Creating simplified version with local components")
     FULL_SYSTEM_AVAILABLE = False
 
 # Local vector database import
@@ -57,12 +57,16 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Configure logging for production (minimal console output)
+try:
+    from logging_config import setup_logging
+    logger = setup_logging(level='WARNING', structured=False)
+except ImportError:
+    logging.basicConfig(
+        level=logging.WARNING,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -282,6 +286,62 @@ class ProductionVectorRAG:
                 logger.error(f"Search error: {e}")
                 return jsonify({'error': 'Search failed'}), 500
         
+        @app.route('/api/documents', methods=['POST'])
+        def add_document():
+            """Add document via JSON (title/content)"""
+            try:
+                data = request.get_json()
+                title = data.get('title', 'Untitled')
+                content = data.get('content', '')
+                source = data.get('source', 'user_upload')
+                
+                if not content:
+                    return jsonify({'error': 'Content is required'}), 400
+                
+                # Chunk large documents to avoid token limits
+                chunks = self._chunk_document(content)
+                
+                results = []
+                for i, chunk in enumerate(chunks):
+                    chunk_title = title
+                    if len(chunks) > 1:
+                        chunk_title += f" (Part {i+1}/{len(chunks)})"
+                    
+                    if self.vector_db:
+                        result = self.vector_db.add_document(
+                            chunk, 
+                            title=chunk_title,
+                            source=source
+                        )
+                        results.append(result)
+                    else:
+                        results.append(f"doc_{i}")
+                
+                return jsonify({
+                    'success': True,
+                    'document_ids': results,
+                    'chunks_processed': len(chunks),
+                    'message': f'Document "{title}" added successfully' + (f' in {len(chunks)} chunks' if len(chunks) > 1 else ''),
+                    'timestamp': datetime.now().isoformat()
+                })
+                
+            except Exception as e:
+                logger.error(f"Document add error: {e}")
+                return jsonify({'error': 'Failed to add document'}), 500
+
+        @app.route('/api/documents', methods=['GET'])
+        def get_documents():
+            """Get all documents"""
+            try:
+                if self.vector_db:
+                    docs = self.vector_db.get_all_documents()
+                    return jsonify(docs)
+                else:
+                    return jsonify([])
+            except Exception as e:
+                logger.error(f"Get documents error: {e}")
+                return jsonify({'error': 'Failed to retrieve documents'}), 500
+
         @app.route('/api/upload', methods=['POST'])
         def upload_document():
             """Upload and process documents"""
@@ -405,8 +465,36 @@ class ProductionVectorRAG:
             'version': '1.0.0'
         }
     
+    def _get_rag_context(self, message: str, max_results: int = 3) -> str:
+        """Get limited RAG context for agent responses"""
+        try:
+            if self.vector_db:
+                search_results = self.vector_db.search(message, limit=max_results)
+                if search_results:
+                    context_parts = []
+                    total_chars = 0
+                    max_context_chars = 20000  # ~5000 tokens
+                    
+                    for result in search_results:
+                        content = result.get('content', '')
+                        # Limit each document snippet to prevent overflow
+                        if len(content) > 8000:  # ~2000 tokens per doc
+                            content = content[:8000] + "..."
+                        
+                        if total_chars + len(content) > max_context_chars:
+                            break
+                        
+                        context_parts.append(f"Document: {result.get('metadata', {}).get('title', 'Unknown')}\n{content}")
+                        total_chars += len(content)
+                    
+                    return "\n\n".join(context_parts)
+            return ""
+        except Exception as e:
+            logger.warning(f"RAG context retrieval failed: {e}")
+            return ""
+
     def _get_agent_response(self, agent_type: str, message: str) -> str:
-        """Get response from specified agent"""
+        """Get response from specified agent with RAG context"""
         agent = self.agents.get(agent_type)
         if not agent:
             return f"Agent {agent_type} is not available"
@@ -425,10 +513,13 @@ class ProductionVectorRAG:
                 finally:
                     loop.close()
             else:
-                # Use simple agent
-                return agent.respond(message)
+                # Use simple agent with RAG context
+                rag_context = self._get_rag_context(message)
+                return agent.respond(message, context=rag_context)
         except Exception as e:
             logger.error(f"Agent {agent_type} error: {e}")
+            if "rate_limit" in str(e).lower() or "429" in str(e):
+                return "I'm currently experiencing high demand. Please try a shorter message or wait a moment before trying again."
             return f"Sorry, I encountered an error: {str(e)}"
     
     def _perform_rag_search(self, query: str) -> List[Dict[str, Any]]:
@@ -464,20 +555,74 @@ class ProductionVectorRAG:
             }
         ]
     
+    def _chunk_document(self, content: str, max_tokens: int = 25000) -> List[str]:
+        """Chunk large document into smaller pieces to avoid token limits"""
+        # Rough estimate: 1 token ≈ 4 characters
+        max_chars = max_tokens * 4
+        
+        if len(content) <= max_chars:
+            return [content]
+        
+        chunks = []
+        current_pos = 0
+        
+        while current_pos < len(content):
+            end_pos = min(current_pos + max_chars, len(content))
+            
+            # Try to break at sentence boundaries
+            if end_pos < len(content):
+                # Look for sentence endings within the last 500 chars
+                last_period = content.rfind('.', current_pos, end_pos - 500)
+                last_newline = content.rfind('\n', current_pos, end_pos - 500)
+                
+                # Use the later of the two
+                break_point = max(last_period, last_newline)
+                if break_point > current_pos + max_chars // 2:  # Only if it's not too early
+                    end_pos = break_point + 1
+            
+            chunk = content[current_pos:end_pos].strip()
+            if chunk:
+                chunks.append(chunk)
+            
+            current_pos = end_pos
+        
+        return chunks
+
     def _process_upload(self, file) -> Dict[str, Any]:
-        """Process uploaded file"""
+        """Process uploaded file with chunking for large documents"""
         try:
             filename = secure_filename(file.filename)
             
             if self.vector_db:
                 # Process with vector database
                 content = file.read().decode('utf-8')
-                result = self.vector_db.add_document(content, {'filename': filename})
+                
+                # Check content size and chunk if necessary
+                chunks = self._chunk_document(content)
+                
+                results = []
+                for i, chunk in enumerate(chunks):
+                    chunk_title = f"{filename}"
+                    if len(chunks) > 1:
+                        chunk_title += f" (Part {i+1}/{len(chunks)})"
+                    
+                    result = self.vector_db.add_document(
+                        chunk, 
+                        title=chunk_title,
+                        source=filename
+                    )
+                    results.append(result)
+                
+                return {
+                    'filename': filename,
+                    'chunks_processed': len(chunks),
+                    'document_ids': results,
+                    'status': 'processed'
+                }
             else:
                 # Simple processing
-                result = {'filename': filename, 'status': 'processed'}
+                return {'filename': filename, 'status': 'processed'}
             
-            return result
         except Exception as e:
             logger.error(f"Upload processing error: {e}")
             raise
@@ -500,8 +645,28 @@ class SimpleAgent:
                 except Exception as e:
                     logger.error(f"Failed to initialize OpenAI for {name}: {e}")
     
-    def respond(self, message: str) -> str:
-        """Generate response to message"""
+    def _limit_context_tokens(self, text: str, max_tokens: int = 20000) -> str:
+        """Limit context to avoid token overflow"""
+        # Rough estimate: 1 token ≈ 4 characters
+        max_chars = max_tokens * 4
+        
+        if len(text) <= max_chars:
+            return text
+        
+        # Try to truncate at sentence boundary
+        truncated = text[:max_chars]
+        last_period = truncated.rfind('.')
+        last_newline = truncated.rfind('\n')
+        
+        # Use the later of the two
+        break_point = max(last_period, last_newline)
+        if break_point > max_chars // 2:  # Only if it's not too early
+            truncated = text[:break_point + 1]
+        
+        return truncated + "\n\n[Content truncated due to length...]"
+
+    def respond(self, message: str, context: str = None) -> str:
+        """Generate response to message with optional context"""
         if not self.openai_client:
             return f"I'm {self.name}, but I need a valid OpenAI API key to provide intelligent responses. Please configure your OPENAI_API_KEY in the .env file."
         
@@ -517,11 +682,21 @@ class SimpleAgent:
             
             system_prompt = system_prompts.get(self.agent_type, "You are a helpful AI assistant.")
             
+            # Limit message length to prevent token overflow
+            limited_message = self._limit_context_tokens(message, 15000)
+            
+            # If context is provided, add it but limit total tokens
+            if context:
+                limited_context = self._limit_context_tokens(context, 8000)
+                user_content = f"Context from knowledge base:\n{limited_context}\n\nUser question: {limited_message}"
+            else:
+                user_content = limited_message
+            
             response = self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message}
+                    {"role": "user", "content": user_content}
                 ],
                 max_tokens=1000,
                 temperature=0.7
@@ -531,62 +706,49 @@ class SimpleAgent:
             
         except Exception as e:
             logger.error(f"OpenAI API error for {self.name}: {e}")
+            if "rate_limit" in str(e).lower() or "429" in str(e):
+                return f"I'm {self.name}, and I'm currently experiencing high demand. Please try your request again in a moment with a shorter message."
             return f"I'm {self.name}, but I'm experiencing technical difficulties. Please check your OpenAI API configuration."
 
 
 def main():
     """Main application entry point"""
-    print("🚀 Vector RAG Database - Production Version")
-    print("=" * 60)
+    logger.info("Vector RAG Database - Production Version starting")
     
     # Initialize the application
     vector_rag = ProductionVectorRAG()
     
     # Initialize components
-    print("📡 Initializing OpenAI connection...")
+    logger.info("Initializing OpenAI connection")
     openai_ok = vector_rag.initialize_openai()
     
-    print("🗄️  Initializing vector database...")
+    logger.info("Initializing vector database")
     vector_ok = vector_rag.initialize_vector_db()
     
-    print("🔍 Initializing RAG system...")
+    logger.info("Initializing RAG system")
     rag_ok = vector_rag.initialize_rag_system()
     
-    print("🤖 Initializing AI agents...")
+    logger.info("Initializing AI agents")
     agents_ok = vector_rag.initialize_agents()
     
     # Create Flask app
     app = vector_rag.create_app()
     
     # Print status
-    print("=" * 60)
-    print("📊 System Status:")
-    print(f"   OpenAI API: {'✅ Connected' if openai_ok else '❌ Not connected'}")
-    print(f"   Vector DB: {'✅ Available' if vector_ok or rag_ok else '❌ Not available'}")
-    print(f"   AI Agents: {'✅ Ready' if agents_ok else '❌ Not ready'} ({len(vector_rag.agents)} agents)")
-    print(f"   Full System: {'✅ Available' if FULL_SYSTEM_AVAILABLE else '❌ Simplified mode'}")
-    print("=" * 60)
+    logger.info(f"System initialized - OpenAI: {openai_ok}, Vector DB: {vector_ok or rag_ok}, Agents: {len(vector_rag.agents)}, Full System: {FULL_SYSTEM_AVAILABLE}")
     
     if not openai_ok:
-        print("⚠️  WARNING: OpenAI API not configured!")
-        print("📝 To enable full functionality:")
-        print("   1. Get your API key from: https://platform.openai.com/api-keys")
-        print("   2. Update .env file: OPENAI_API_KEY=your_actual_key")
-        print("   3. Restart the application")
-        print()
+        logger.warning("OpenAI API not configured - limited functionality available")
     
-    print(f"🌐 Starting server on http://localhost:5001")
-    print(f"🎯 {len(vector_rag.agents)} AI agents ready for interaction")
-    print(f"💫 Vector RAG Database interface loading...")
-    print("=" * 60)
+    logger.info(f"Server starting on http://localhost:5001 with {len(vector_rag.agents)} agents")
     
     # Start the application
     try:
         app.run(debug=False, host='0.0.0.0', port=5001)
     except KeyboardInterrupt:
-        print("\n👋 Vector RAG Database shutting down...")
+        logger.info("Vector RAG Database shutting down")
     except Exception as e:
-        print(f"\n❌ Application error: {e}")
+        logger.error(f"Application error: {e}")
         return 1
     
     return 0

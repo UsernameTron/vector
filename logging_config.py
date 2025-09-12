@@ -54,7 +54,7 @@ def setup_logging(
         request_id: Request ID for correlation
     """
     # Get configuration from environment
-    level = level or os.getenv('LOG_LEVEL', 'INFO')
+    level = level or os.getenv('LOG_LEVEL', 'WARNING')
     log_file = log_file or os.getenv('LOG_FILE_PATH')
     structured = structured or os.getenv('LOG_STRUCTURED', '').lower() == 'true'
     
@@ -106,12 +106,27 @@ def setup_logging(
             # Third-party loggers (reduce noise)
             'werkzeug': {
                 'handlers': ['console'],
-                'level': 'WARNING',
+                'level': 'ERROR',
                 'propagate': False,
             },
             'chromadb': {
                 'handlers': ['console'],
-                'level': 'WARNING',
+                'level': 'ERROR',
+                'propagate': False,
+            },
+            'urllib3': {
+                'handlers': ['console'],
+                'level': 'ERROR',
+                'propagate': False,
+            },
+            'requests': {
+                'handlers': ['console'],
+                'level': 'ERROR',
+                'propagate': False,
+            },
+            'openai': {
+                'handlers': ['console'],
+                'level': 'ERROR',
                 'propagate': False,
             },
         },

@@ -39,10 +39,16 @@ class FileParser:
     # Encoding options to try
     ENCODINGS = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'ascii']
     
-    def __init__(self):
-        """Initialize the file parser"""
+    def __init__(self, consolidate_documents: bool = True):
+        """Initialize the file parser
+        
+        Args:
+            consolidate_documents: If True, creates consolidated documents per chunk/sheet.
+                                 If False, creates one document per row (legacy behavior).
+        """
         self.documents_generated = 0
         self.errors_encountered = []
+        self.consolidate_documents = consolidate_documents
 
     def validate_file(self, file_content: bytes, filename: str) -> None:
         """
@@ -214,6 +220,110 @@ class FileParser:
             
         Returns:
             List of document dictionaries
+        """
+        if self.consolidate_documents:
+            return self._dataframe_to_consolidated_documents(df, filename, source, sheet_name)
+        else:
+            return self._dataframe_to_row_documents(df, filename, source, sheet_name)
+    
+    def _dataframe_to_consolidated_documents(self, df: pd.DataFrame, filename: str, source: str, sheet_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Convert DataFrame to consolidated document format (default behavior)
+        Creates one document per chunk/sheet containing all rows
+        """
+        documents = []
+        timestamp = datetime.now().isoformat()
+        
+        # Clean column names
+        df.columns = [self._clean_column_name(col) for col in df.columns]
+        
+        # Process in chunks if file is large
+        total_rows = len(df)
+        chunks = self._chunk_dataframe(df, self.CHUNK_SIZE)
+        
+        for chunk_idx, chunk_df in enumerate(chunks):
+            chunk_start = chunk_idx * self.CHUNK_SIZE
+            chunk_end = min(chunk_start + len(chunk_df), total_rows)
+            
+            # Create consolidated document for this chunk
+            chunk_content_parts = []
+            chunk_metadata = {
+                'filename': filename,
+                'source': source,
+                'chunk': chunk_idx,
+                'timestamp': timestamp,
+                'file_type': 'excel' if sheet_name else 'csv',
+                'total_rows': total_rows,
+                'chunk_start_row': chunk_start + 1,
+                'chunk_end_row': chunk_end,
+                'rows_in_chunk': len(chunk_df)
+            }
+            
+            if sheet_name:
+                chunk_metadata['sheet_name'] = sheet_name
+            
+            # Process each row in the chunk
+            for idx, row in chunk_df.iterrows():
+                try:
+                    row_parts = []
+                    
+                    # Process each column
+                    for col_name in df.columns:
+                        cell_value = row[col_name]
+                        
+                        # Skip empty/null values
+                        if pd.isna(cell_value) or cell_value == '':
+                            continue
+                        
+                        # Convert value to string and clean it
+                        str_value = self._clean_cell_value(cell_value)
+                        
+                        if str_value:
+                            row_parts.append(f"{col_name}: {str_value}")
+                    
+                    # Add row to chunk content if it has data
+                    if row_parts:
+                        row_content = f"[Row: {idx + 1}] " + " | ".join(row_parts)
+                        chunk_content_parts.append(row_content)
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing row {idx}: {str(e)}")
+                    self.errors_encountered.append(f"Row {idx}: {str(e)}")
+                    continue
+            
+            # Create consolidated document for this chunk if it has content
+            if chunk_content_parts:
+                chunk_content = "\n".join(chunk_content_parts)
+                
+                # Create title based on sheet and chunk info
+                if sheet_name:
+                    if len(chunks) == 1:
+                        title = f"{filename} ({sheet_name})"
+                    else:
+                        title = f"{filename} ({sheet_name}) - Part {chunk_idx + 1}"
+                else:
+                    if len(chunks) == 1:
+                        title = filename
+                    else:
+                        title = f"{filename} - Part {chunk_idx + 1}"
+                
+                document = {
+                    'id': str(uuid.uuid4()),
+                    'content': chunk_content,
+                    'metadata': chunk_metadata,
+                    'title': title,
+                    'source': source
+                }
+                
+                documents.append(document)
+                self.documents_generated += 1
+        
+        return documents
+    
+    def _dataframe_to_row_documents(self, df: pd.DataFrame, filename: str, source: str, sheet_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Convert DataFrame to row-based document format (legacy behavior)
+        Creates one document per row
         """
         documents = []
         timestamp = datetime.now().isoformat()
@@ -418,7 +528,7 @@ class FileParser:
         self.errors_encountered = []
 
 
-def parse_uploaded_file(file_content: bytes, filename: str, source: str = "file_upload") -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def parse_uploaded_file(file_content: bytes, filename: str, source: str = "file_upload", consolidate_documents: bool = True) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Convenience function to parse uploaded files
     
@@ -426,11 +536,13 @@ def parse_uploaded_file(file_content: bytes, filename: str, source: str = "file_
         file_content: Raw file bytes
         filename: Original filename
         source: Source identifier
+        consolidate_documents: If True, creates consolidated documents (default).
+                              If False, creates one document per row (legacy).
         
     Returns:
         Tuple of (documents, parsing_stats)
     """
-    parser = FileParser()
+    parser = FileParser(consolidate_documents=consolidate_documents)
     
     try:
         documents = parser.parse_file(file_content, filename, source)

@@ -483,8 +483,28 @@ class SimpleAgent:
                 except Exception as e:
                     logger.error(f"Failed to initialize OpenAI for {name}: {e}")
     
-    def respond(self, message: str) -> str:
-        """Generate response to message"""
+    def _limit_context_tokens(self, text: str, max_tokens: int = 20000) -> str:
+        """Limit context to avoid token overflow"""
+        # Rough estimate: 1 token ≈ 4 characters
+        max_chars = max_tokens * 4
+        
+        if len(text) <= max_chars:
+            return text
+        
+        # Try to truncate at sentence boundary
+        truncated = text[:max_chars]
+        last_period = truncated.rfind('.')
+        last_newline = truncated.rfind('\n')
+        
+        # Use the later of the two
+        break_point = max(last_period, last_newline)
+        if break_point > max_chars // 2:  # Only if it's not too early
+            truncated = text[:break_point + 1]
+        
+        return truncated + "\n\n[Content truncated due to length...]"
+
+    def respond(self, message: str, context: str = None) -> str:
+        """Generate response to message with optional context and token limiting"""
         if not self.openai_client:
             return f"I'm {self.name}, but I need a valid OpenAI API key to provide intelligent responses. Please configure your OPENAI_API_KEY in the .env file."
         
@@ -500,11 +520,21 @@ class SimpleAgent:
             
             system_prompt = system_prompts.get(self.agent_type, "You are a helpful AI assistant.")
             
+            # Limit message length to prevent token overflow
+            limited_message = self._limit_context_tokens(message, 15000)
+            
+            # If context is provided, add it but limit total tokens
+            if context:
+                limited_context = self._limit_context_tokens(context, 8000)
+                user_content = f"Context from knowledge base:\n{limited_context}\n\nUser question: {limited_message}"
+            else:
+                user_content = limited_message
+            
             response = self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message}
+                    {"role": "user", "content": user_content}
                 ],
                 max_tokens=1000,
                 temperature=0.7
@@ -514,6 +544,8 @@ class SimpleAgent:
             
         except Exception as e:
             logger.error(f"OpenAI API error for {self.name}: {e}")
+            if "rate_limit" in str(e).lower() or "429" in str(e):
+                return f"I'm {self.name}, and I'm currently experiencing high demand. Please try your request again in a moment with a shorter message."
             return f"I'm {self.name}, but I'm experiencing technical difficulties. Please check your OpenAI API configuration."
 
 

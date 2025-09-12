@@ -140,15 +140,27 @@ class VectorRAGLauncher:
 🔍 Smart Search: Semantic search with context-aware results
 💬 Agent Chat: Interactive conversations with specialized AI agents
 
-🎯 6 Specialized AI Agents Available:
+🎯 8 Specialized AI Agents Available:
 • 📈 Research Agent - Market intelligence & data analysis
 • 👔 CEO Agent - Strategic business decisions & leadership
 • ⚡ Performance Agent - Metrics analysis & optimization
 • 🎓 Coaching Agent - Training & development guidance  
 • 💼 Business Intelligence Agent - Data insights & reporting
 • 📞 Contact Center Director - Customer service management
+• 🔍 Code Analyzer Agent - Code review and analysis
+• 🎯 Triage Agent - Issue prioritization and routing
 
-🔧 Advanced Capabilities:
+🚀 Advanced RAG Features (NEW):
+• Dynamic Context Management - Intelligent context window optimization
+• Query Intelligence & Expansion - Smart query processing and routing
+• Multi-hop Graph Reasoning - Entity extraction and relationship mapping
+• Advanced Retrieval Patterns - ColBERT, SPLADE, and hybrid retrieval
+• Real-time Quality Monitoring - Confidence scoring and hallucination detection
+• Embedding Optimization - Quantization and domain-specific embeddings
+• Advanced Caching with Redis - Multi-level intelligent caching
+• Comprehensive RAG Evaluation - 20+ metrics with A/B testing
+
+🔧 Core Capabilities:
 • Vector embeddings for semantic document understanding
 • RAG (Retrieval-Augmented Generation) for context-aware responses
 • Cyberpunk-themed UI with smooth animations
